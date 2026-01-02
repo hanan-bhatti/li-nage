@@ -2,6 +2,7 @@ using System;
 
 namespace Linage.Core
 {
+    [Serializable]
     public class AIAccessLog
     {
         public string AccessType { get; set; } = string.Empty;

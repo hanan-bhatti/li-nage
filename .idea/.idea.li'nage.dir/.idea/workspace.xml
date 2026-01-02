@@ -7,7 +7,40 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="32c24d99-153a-4c9b-83ae-d754e5bf46c9" name="Changes" comment="" />
+    <list default="true" id="32c24d99-153a-4c9b-83ae-d754e5bf46c9" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.li'nage.dir/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.li'nage.dir/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Controllers/AIActivityController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/AIActivityController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Controllers/DebugController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/DebugController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Controllers/IndexController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/IndexController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Controllers/ScanController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/ScanController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Controllers/VersionController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/VersionController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/AIAccessLog.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/AIAccessLog.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/Branch.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Branch.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/ChangeDetector.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/ChangeDetector.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/Commit.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Commit.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/FileScanner.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/FileScanner.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/HashService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/HashService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/LineChange.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/LineChange.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/LineTracker.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/LineTracker.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/RecoveryManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/RecoveryManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/Snapshot.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Snapshot.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/VersionGraphService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/VersionGraphService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/GUI/CommandDispatcher.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/CommandDispatcher.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/GUI/DebugView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/DebugView.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/GUI/EditorView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/EditorView.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/GUI/GitGraphView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/GitGraphView.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/GUI/MainWindow.Designer.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/GUI/MainWindow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/MainWindow.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/GUI/TerminalView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/TerminalView.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Infrastructure/FileMetadata.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Infrastructure/FileService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Infrastructure/FileService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Infrastructure/FileWatcher.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Infrastructure/FileWatcher.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Infrastructure/MetadataStore.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Infrastructure/MetadataStore.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Linage.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/Linage.csproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/init_linage.sh" beforeDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -17,11 +50,26 @@
     <option name="firstShow" value="false" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="38" />
+    <option name="cachedIndexableFilesCount" value="22" />
     <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
   </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/Controllers/IndexController.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Controllers/ScanController.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Controllers/VersionController.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Core/Authentication/AuthenticationService.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Core/FileScanner.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/GUI/CommandDispatcher.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Program.cs" root0="FORCE_HIGHLIGHTING" />
+  </component>
+  <component name="LLMProjectSettings">
+    <option name="turned_on" value="false" />
+  </component>
   <component name="ProblemsViewState">
-    <option name="selectedTabId" value="Toolset" />
+    <option name="selectedTabId" value="CurrentFile" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;customColor&quot;: &quot;&quot;,
@@ -37,22 +85,25 @@
     ".NET Project.Linage.executor": "Run",
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "git-widget-placeholder": "main",
     "ignore.virus.scanning.warn.message": "true",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "SolutionBuilderGeneralOptionsPage",
+    "settings.editor.selected.configurable": "com.anthropic.code.plugin.settings",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
   <component name="RunManager">
     <configuration name="Linage" type="DotNetProject" factoryName=".NET Project">
-      <option name="EXE_PATH" value="" />
+      <option name="EXE_PATH" value="$PROJECT_DIR$/bin/Debug/net48/Linage.exe" />
       <option name="PROGRAM_PARAMETERS" value="" />
-      <option name="WORKING_DIRECTORY" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/bin/Debug/net48" />
       <option name="PASS_PARENT_ENVS" value="1" />
       <option name="ENV_FILE_PATHS" value="" />
       <option name="REDIRECT_INPUT_PATH" value="" />
@@ -65,7 +116,7 @@
       <option name="PROJECT_ARGUMENTS_TRACKING" value="1" />
       <option name="PROJECT_WORKING_DIRECTORY_TRACKING" value="1" />
       <option name="PROJECT_KIND" value="DotNetCore" />
-      <option name="PROJECT_TFM" value="" />
+      <option name="PROJECT_TFM" value=".NETFramework,Version=v4.8" />
       <method v="2">
         <option name="Build" />
       </method>
@@ -81,6 +132,25 @@
       <workItem from="1765965877218" duration="225000" />
       <workItem from="1765966319919" duration="208000" />
       <workItem from="1765966554128" duration="6879000" />
+      <workItem from="1766420609286" duration="210000" />
+      <workItem from="1766420910292" duration="3573000" />
+      <workItem from="1766467061057" duration="479000" />
+      <workItem from="1766476026473" duration="5469000" />
+      <workItem from="1766483242444" duration="280000" />
+      <workItem from="1766483842440" duration="388000" />
+      <workItem from="1766484302122" duration="215000" />
+      <workItem from="1766484554195" duration="240000" />
+      <workItem from="1766484837322" duration="705000" />
+      <workItem from="1766586712437" duration="1196000" />
+      <workItem from="1767001962474" duration="2789000" />
+      <workItem from="1767053301755" duration="129000" />
+      <workItem from="1767053456051" duration="1487000" />
+      <workItem from="1767073050854" duration="386000" />
+      <workItem from="1767073481014" duration="16054000" />
+      <workItem from="1767115128224" duration="282000" />
+      <workItem from="1767121842986" duration="7528000" />
+      <workItem from="1767174786089" duration="616000" />
+      <workItem from="1767279812569" duration="5608000" />
     </task>
     <servers />
   </component>
@@ -108,5 +178,9 @@
         </breakpoint>
       </breakpoints>
     </breakpoint-manager>
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
   </component>
 </project>

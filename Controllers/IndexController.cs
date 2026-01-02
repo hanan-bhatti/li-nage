@@ -9,7 +9,12 @@ namespace Linage.Controllers
         public string Status { get; set; } = "Idle";
         public DateTime LastRunTime { get; set; }
 
-        public MetadataStore Store { get; set; } = new MetadataStore();
+        public MetadataStore Store { get; set; }
         public HashService Hasher { get; set; } = new HashService();
+
+        public IndexController()
+        {
+            Store = new MetadataStore(new LiNageDbContext());
+        }
     }
 }

@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using Linage.Infrastructure;
 
 namespace Linage.Core
@@ -9,7 +11,14 @@ namespace Linage.Core
 
         public FileMetadata CreateMetadata(string path) 
         { 
-            return new FileMetadata { Path = path }; 
+            var fileInfo = new FileInfo(path);
+            return new FileMetadata(
+                path, 
+                path, 
+                fileInfo.Exists ? fileInfo.Length : 0, 
+                fileInfo.Exists ? fileInfo.LastWriteTime : DateTime.Now,
+                false
+            ); 
         }
     }
 }
