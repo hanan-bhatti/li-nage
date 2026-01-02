@@ -237,7 +237,8 @@ namespace Linage.GUI
                     if (nameMatch || childMatch)
                     {
                         parentNode.Nodes.Add(dirNode);
-                        if (childMatch || !string.IsNullOrEmpty(filter)) dirNode.Expand(); // Expand if children matched
+                        // Only expand if the user is searching (filtering)
+                        if (!string.IsNullOrEmpty(filter) && childMatch) dirNode.Expand(); 
                         anyMatch = true;
                     }
                 }

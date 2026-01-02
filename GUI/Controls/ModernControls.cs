@@ -369,19 +369,43 @@ namespace Linage.GUI.Controls
             TextRenderer.DrawText(g, node.Text, this.Font, new Point(left, bounds.Top + 4), textColor, TextFormatFlags.Left | TextFormatFlags.Top);
         }
 
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            // Custom Expand/Collapse logic for Chevron click
+            var info = this.HitTest(e.Location);
+            if (info.Node != null && e.Button == MouseButtons.Left)
+            {
+                // Calculate Chevron Bounds
+                // Logic must match OnDrawNode: left = bounds.Left + (level * 16) + 5
+                int indent = 16;
+                int left = info.Node.Bounds.Left + (info.Node.Level * indent) + 5;
+                // Chevron is roughly at left+4, width ~8px. 
+                // Let's define a click zone: from left to left+16
+                
+                // Note: TreeView.HitTest gives the node even if we click strictly on the indent area? 
+                // HitTestLocation.Indent exists.
+                
+                if (info.Location == TreeViewHitTestLocations.Indent || 
+                   (e.X >= left && e.X <= left + 16))
+                {
+                    if (info.Node.IsExpanded) info.Node.Collapse();
+                    else info.Node.Expand();
+                    return; // Handled
+                }
+            }
+
+            base.OnMouseDown(e);
+        }
+
         private void DrawIcon(Graphics g, TreeNode node, int x, int y)
         {
             // Simple Vector Icons
             // Size 14x14
             int size = 14;
             
-            // Check if folder or file
-            bool isFolder = node.Nodes.Count > 0 || (node.Tag is string path && System.IO.Directory.Exists(path));
-            // Note: node.Nodes.Count > 0 is reliable for loaded trees, but empty folders might look like files. 
-            // Better to rely on ImageIndex if set by explorer, or Tag.
-            // Let's assume ImageIndex 0 = Folder, 1 = File for now as set in FileExplorerView
-            
-            isFolder = node.ImageIndex == 0;
+            // OPTIMIZATION: Do not use File.Exists/Directory.Exists here!
+            // Use ImageIndex as the source of truth (0 = Folder, 1 = File)
+            bool isFolder = node.ImageIndex == 0;
 
             if (isFolder)
             {

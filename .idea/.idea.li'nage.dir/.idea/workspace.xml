@@ -8,38 +8,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="32c24d99-153a-4c9b-83ae-d754e5bf46c9" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.li'nage.dir/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.li'nage.dir/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Controllers/AIActivityController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/AIActivityController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Controllers/DebugController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/DebugController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Controllers/IndexController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/IndexController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Controllers/ScanController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/ScanController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Controllers/VersionController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/VersionController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/AIAccessLog.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/AIAccessLog.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/Branch.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Branch.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/ChangeDetector.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/ChangeDetector.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/Commit.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Commit.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/FileScanner.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/FileScanner.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/HashService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/HashService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/LineChange.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/LineChange.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/LineTracker.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/LineTracker.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/RecoveryManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/RecoveryManager.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/Snapshot.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Snapshot.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/VersionGraphService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/VersionGraphService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/CommandDispatcher.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/CommandDispatcher.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/DebugView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/DebugView.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/EditorView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/EditorView.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/GitGraphView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/GitGraphView.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/MainWindow.Designer.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Docs/GEMINI_PHASE4_REPORT.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Docs/IMPLEMENTATION_COMPLETE.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Docs/QUICK_REFERENCE.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/GUI/Controls/ModernControls.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Controls/ModernControls.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/GUI/FileExplorerView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/FileExplorerView.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/GUI/MainWindow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/MainWindow.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/TerminalView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/TerminalView.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Infrastructure/FileMetadata.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Infrastructure/FileService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Infrastructure/FileService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Infrastructure/FileWatcher.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Infrastructure/FileWatcher.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Infrastructure/MetadataStore.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Infrastructure/MetadataStore.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Linage.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/Linage.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/init_linage.sh" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -95,7 +70,7 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "com.anthropic.code.plugin.settings",
+    "settings.editor.selected.configurable": "settings.sync",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -150,7 +125,7 @@
       <workItem from="1767115128224" duration="282000" />
       <workItem from="1767121842986" duration="7528000" />
       <workItem from="1767174786089" duration="616000" />
-      <workItem from="1767279812569" duration="5608000" />
+      <workItem from="1767279812569" duration="6917000" />
     </task>
     <servers />
   </component>

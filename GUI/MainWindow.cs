@@ -324,6 +324,15 @@ namespace Linage.GUI
                     // Let's open the Graph in the main editor area and keep sidebar as Explorer for now
                     if (!IsTabOpen("Commit Graph"))
                     {
+                        if (_gitGraphView == null || _gitGraphView.IsDisposed)
+                        {
+                            _gitGraphView = new GitGraphView { Dock = DockStyle.Fill };
+                            if (_versionController != null)
+                            {
+                                 _gitGraphView.SetCommits(_versionController.GraphService.GetCommitHistory());
+                            }
+                        }
+
                         var tab = new TabPage("Commit Graph") { Name = "Graph" };
                         tab.Controls.Add(_gitGraphView);
                         _editorTabs.TabPages.Insert(0, tab);
