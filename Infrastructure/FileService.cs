@@ -36,15 +36,15 @@ namespace Linage.Infrastructure
             // Initialize gitignore parser
             _gitignoreParser = new GitignoreParser(repositoryPath);
 
-            // Load .gitignore if exists
+            // Load both .gitignore and .linageignore files
+            // .linageignore takes precedence
+            _gitignoreParser.LoadAllIgnoreFiles();
+
+            // If neither file exists, load default patterns
             var gitignorePath = Path.Combine(repositoryPath, ".gitignore");
-            if (File.Exists(gitignorePath))
+            var linageignorePath = Path.Combine(repositoryPath, ".linageignore");
+            if (!File.Exists(gitignorePath) && !File.Exists(linageignorePath))
             {
-                _gitignoreParser.LoadFromFile(gitignorePath);
-            }
-            else
-            {
-                // Load default patterns if no .gitignore exists
                 _gitignoreParser.LoadDefaultPatterns();
             }
         }
@@ -152,7 +152,37 @@ namespace Linage.Infrastructure
                 if (_gitignoreParser != null && _gitignoreParser.IsIgnored(file, false))
                     continue;
 
-                results.Add(GetMetadata(file, rootPath));
+                try
+                {
+                    var info = new FileInfo(file);
+                    var hash = _hashService.ComputeFileHash(file);
+
+                    // Store content in blob store if initialized
+                    if (_blobStore != null)
+                    {
+                        try { _blobStore.StoreFile(file); }
+                        catch { /* Ignore */ }
+                    }
+
+                    // Convert to relative path with forward slashes
+                    string relativePath = file;
+                    if (file.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        relativePath = file.Substring(rootPath.Length)
+                            .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    }
+                    relativePath = relativePath.Replace('\\', '/');
+
+                    var metadata = new FileMetadata(
+                        filePath: relativePath,
+                        fileHash: hash,
+                        fileSize: info.Length,
+                        modifiedDate: info.LastWriteTime
+                    );
+                    results.Add(metadata);
+                }
+                catch (IOException) { /* Skip locked files */ }
+                catch (UnauthorizedAccessException) { /* Skip inaccessible files */ }
             }
             return results;
         }
@@ -251,8 +281,17 @@ namespace Linage.Infrastructure
                                 }
                             }
 
+                            // Store file path as RELATIVE path with forward slashes for cross-platform compatibility
+                            string relativePath = file;
+                            if (file.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+                            {
+                                relativePath = file.Substring(rootPath.Length)
+                                    .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                            }
+                            relativePath = relativePath.Replace('\\', '/');
+
                             var metadata = new FileMetadata(
-                                filePath: file,
+                                filePath: relativePath,
                                 fileHash: hash,
                                 fileSize: info.Length,
                                 modifiedDate: info.LastWriteTime

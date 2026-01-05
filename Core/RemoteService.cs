@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Linage.Infrastructure;
 
 namespace Linage.Core
@@ -13,44 +14,45 @@ namespace Linage.Core
             _metadataStore = metadataStore ?? throw new ArgumentNullException(nameof(metadataStore));
         }
 
-        public void AddRemote(string name, string url, RemoteProtocol protocol = RemoteProtocol.HTTPS)
+        public async Task AddRemoteAsync(string name, string url, RemoteProtocol protocol = RemoteProtocol.HTTPS)
         {
             if (string.IsNullOrEmpty(name)) throw new ArgumentException("Remote name cannot be empty.");
             if (string.IsNullOrEmpty(url)) throw new ArgumentException("Remote URL cannot be empty.");
 
+            var allRemotes = await _metadataStore.GetAllRemotesAsync();
             var remote = new Remote
             {
                 RemoteName = name,
                 RemoteUrl = url,
                 Protocol = protocol,
-                IsDefault = _metadataStore.GetAllRemotes().Count == 0
+                IsDefault = allRemotes.Count == 0
             };
 
-            _metadataStore.SaveRemote(remote);
+            await _metadataStore.SaveRemoteAsync(remote);
         }
 
-        public Remote GetRemote(string name)
+        public async Task<Remote> GetRemoteAsync(string name)
         {
-            return _metadataStore.GetRemote(name);
+            return await _metadataStore.GetRemoteAsync(name);
         }
 
-        public List<Remote> GetAllRemotes()
+        public async Task<List<Remote>> GetAllRemotesAsync()
         {
-            return _metadataStore.GetAllRemotes();
+            return await _metadataStore.GetAllRemotesAsync();
         }
 
-        public void RemoveRemote(string name)
+        public async Task RemoveRemoteAsync(string name)
         {
-            _metadataStore.DeleteRemote(name);
+            await _metadataStore.DeleteRemoteAsync(name);
         }
 
-        public void SetDefaultRemote(string name)
+        public async Task SetDefaultRemoteAsync(string name)
         {
-            var remotes = _metadataStore.GetAllRemotes();
+            var remotes = await _metadataStore.GetAllRemotesAsync();
             foreach (var r in remotes)
             {
                 r.IsDefault = (r.RemoteName == name);
-                _metadataStore.SaveRemote(r);
+                await _metadataStore.SaveRemoteAsync(r);
             }
         }
     }

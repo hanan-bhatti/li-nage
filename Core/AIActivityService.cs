@@ -30,7 +30,7 @@ namespace Linage.Core
                 Description = description,
                 LinesAffected = linesAffected,
                 Confidence = confidence,
-                CommitId = commitId ?? Guid.Empty // Associate with commit if available
+                CommitId = commitId ?? Guid.Empty // Associate with commit if available 
             };
 
             LogActivity(activity);

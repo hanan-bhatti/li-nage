@@ -2,10 +2,11 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using Linage.Core;
+using Linage.GUI.Theme;
 
 namespace Linage.GUI
 {
-    public class MergeConflictView : UserControl
+    public class MergeConflictView : UserControl, IThemable
     {
         private SplitContainer splitContainerMain;
         private RichTextBox _rtbLocal;
@@ -23,6 +24,33 @@ namespace Linage.GUI
         public MergeConflictView()
         {
             InitializeComponent();
+            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "MergeConflictView.cs");
+        }
+
+        public void ApplyTheme()
+        {
+            this.BackColor = ModernTheme.BackColor;
+            this.ForeColor = ModernTheme.TextPrimary;
+
+            if (_lblConflictInfo != null) _lblConflictInfo.ForeColor = ModernTheme.TextPrimary;
+            
+            if (_rtbLocal != null)
+            {
+                _rtbLocal.BackColor = ModernTheme.BackColor;
+                _rtbLocal.ForeColor = ModernTheme.TextPrimary;
+            }
+
+            if (_rtbRemote != null)
+            {
+                _rtbRemote.BackColor = ModernTheme.BackColor;
+                _rtbRemote.ForeColor = ModernTheme.TextPrimary;
+            }
+
+            if (_rtbResult != null)
+            {
+                _rtbResult.BackColor = ModernTheme.BackColor;
+                _rtbResult.ForeColor = ModernTheme.TextPrimary;
+            }
         }
 
         private void InitializeComponent()

@@ -2,15 +2,45 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Linage.GUI.Theme;
 using Linage.Controllers;
 using Linage.Core;
+using Linage.Infrastructure;
 
 namespace Linage.GUI
 {
-    public class TerminalView : UserControl
+    public class TerminalView : UserControl, IThemable
     {
+        // ...
+
+        public void ApplyTheme()
+        {
+            this.BackColor = ModernTheme.BackColor;
+            
+            // Layout (TableLayoutPanel)
+            if (this.Controls.Count > 0 && this.Controls[0] is TableLayoutPanel layout)
+            {
+                layout.BackColor = ModernTheme.BackColor;
+            }
+
+            if (_output != null)
+            {
+                _output.BackColor = ModernTheme.BackColor;
+                _output.ForeColor = ModernTheme.TextPrimary;
+                _output.Font = ModernTheme.FontCode;
+            }
+
+            if (_input != null)
+            {
+                _input.BackColor = ModernTheme.InputBack;
+                _input.ForeColor = ModernTheme.TextPrimary;
+                _input.Font = ModernTheme.FontCode;
+            }
+        }
+
         private TextBox _input;
         private RichTextBox _output;
         private List<string> _commandHistory;
@@ -26,6 +56,7 @@ namespace Linage.GUI
         {
             _commandHistory = new List<string>();
             InitializeComponent();
+            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "TerminalView.cs");
         }
 
         private void InitializeComponent()

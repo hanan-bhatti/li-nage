@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using LibGit2Sharp;
 using Linage.Core;
 using Linage.Infrastructure;
@@ -45,7 +46,7 @@ namespace Linage.Core
         /// Import a Git repository into Li'nage.
         /// Creates .linage directory and converts commits.
         /// </summary>
-        public ImportResult ImportRepository(string gitRepoPath, IProgress<string> progress = null)
+        public async Task<ImportResult> ImportRepositoryAsync(string gitRepoPath, IProgress<string> progress = null)
         {
             if (!Repository.IsValid(gitRepoPath))
                 throw new ArgumentException($"Not a valid Git repository: {gitRepoPath}");
@@ -61,7 +62,14 @@ namespace Linage.Core
                 if (!Directory.Exists(linageDir))
                     Directory.CreateDirectory(linageDir);
 
-                // 2. Initialize blob store
+                // 2. Create .linageignore file from .gitignore (if it doesn't exist)
+                if (!GitignoreParser.LinageignoreExists(gitRepoPath))
+                {
+                    progress?.Report("Creating .linageignore file...");
+                    GitignoreParser.CreateLinageignoreFromGitignore(gitRepoPath);
+                }
+
+                // 3. Initialize blob store
                 _fileService.InitializeBlobStore(gitRepoPath);
 
                 // 3. Create Project entity (required for foreign key constraints)
@@ -72,24 +80,28 @@ namespace Linage.Core
                     RepositoryPath = gitRepoPath,
                     CreatedDate = DateTime.Now
                 };
-                _metadataStore.SaveProject(project);
+                await _metadataStore.SaveProjectAsync(project);
 
                 using (var repo = new Repository(gitRepoPath))
                 {
                     // 4. Import branches
+                    var globalCommitMap = new Dictionary<string, Commit>(); // Global cache to prevent duplicates
+
                     foreach (var gitBranch in repo.Branches)
                     {
                         if (gitBranch.IsRemote) continue; // Skip remote branches for now
 
                         result.BranchesImported++;
                         progress?.Report($"Importing branch: {gitBranch.FriendlyName} ({result.BranchesImported}/{repo.Branches.Count(b => !b.IsRemote)})");
-                        ImportBranch(repo, gitBranch, gitRepoPath, progress);
+                        
+                        var importedCount = await ImportBranchAsync(repo, gitBranch, gitRepoPath, progress, globalCommitMap);
+                        result.CommitsImported += importedCount;
                     }
 
                     // 5. Import remotes (now that Project exists)
                     foreach (var remote in repo.Network.Remotes)
                     {
-                        ImportRemote(remote, project.ProjectId);
+                        await ImportRemoteAsync(remote, project.ProjectId);
                         result.RemotesImported++;
                     }
 
@@ -153,10 +165,12 @@ namespace Linage.Core
             return result;
         }
 
-        private void ImportBranch(Repository gitRepo, LibGit2Sharp.Branch gitBranch, string repoPath, IProgress<string> progress)
+        private async Task<int> ImportBranchAsync(Repository gitRepo, LibGit2Sharp.Branch gitBranch, string repoPath, 
+            IProgress<string> progress, Dictionary<string, Commit> commitMap)
         {
+            int newCommits = 0;
             // Check if Li'nage branch already exists
-            var existingBranch = _graphService.GetBranch(gitBranch.FriendlyName);
+            var existingBranch = await _graphService.GetBranchAsync(gitBranch.FriendlyName);
             Branch linageBranch;
 
             if (existingBranch != null)
@@ -176,32 +190,42 @@ namespace Linage.Core
                 };
 
                 // Save to database via MetadataStore
-                _metadataStore.SaveBranch(linageBranch);
+                await _metadataStore.SaveBranchAsync(linageBranch);
 
                 // Set as current branch if this is the first branch being imported
                 if (_graphService.GetCurrentBranch() == null)
                 {
-                    _graphService.SwitchBranch(gitBranch.FriendlyName);
+                    await _graphService.SwitchBranchAsync(gitBranch.FriendlyName);
                 }
             }
 
             // Walk commits from oldest to newest
             var commits = gitBranch.Commits.Reverse().ToList();
-            var commitMap = new Dictionary<string, Commit>(); // Git SHA -> Li'nage Commit
-
+            
             foreach (var gitCommit in commits)
             {
+                // If commit already imported (shared history), just reuse it
+                if (commitMap.TryGetValue(gitCommit.Sha, out var existingCommit))
+                {
+                   // Ensure branch points to it if it's the tip (or moving towards it)
+                   linageBranch.MoveHead(existingCommit);
+                   continue;
+                }
+
                 var linageCommit = ConvertCommit(gitCommit, repoPath, commitMap);
 
                 // Add to graph
-                _graphService.AddCommit(linageCommit);
+                await _graphService.AddCommitAsync(linageCommit);
                 commitMap[gitCommit.Sha] = linageCommit;
+                newCommits++;
 
                 progress?.Report($"Imported commit {linageCommit.CommitHash.Substring(0,7)}: {linageCommit.Message}");
 
                 // Update branch head
                 linageBranch.MoveHead(linageCommit);
             }
+            
+            return newCommits;
         }
 
         private Commit ConvertCommit(LibGit2Sharp.Commit gitCommit, string repoPath, 
@@ -234,15 +258,15 @@ namespace Linage.Core
                 Files = new List<FileMetadata>()
             };
 
-            // Convert Git tree to file metadata
-            foreach (var entry in gitCommit.Tree)
+            // Convert Git tree to file metadata - Use recursive tree flattening
+            foreach (var entry in FlattenTree(gitCommit.Tree))
             {
                 try
                 {
                     if (entry.TargetType == TreeEntryTargetType.Blob)
                     {
                         var blob = (Blob)entry.Target;
-                        
+
                         // Skip binary files or very large files
                         if (blob.IsBinary || blob.Size > 10 * 1024 * 1024) // Skip files > 10MB
                             continue;
@@ -254,12 +278,14 @@ namespace Linage.Core
                         // Store in blob store (Li'nage object storage)
                         _fileService.StoreContent(content);
 
-                        // Store in blob store
+                        // Compute hash using string content - this normalizes line endings
+                        // to ensure consistency with ComputeFileHash which also normalizes
                         var hash = _hashService.ComputeContentHash(content);
-                        
-                        // Create file metadata (Li'nage style)
+
+                        // Create file metadata with relative path (forward slashes for cross-platform)
+                        // The path from Git tree is already relative with forward slashes
                         var metadata = new FileMetadata(
-                            filePath: entry.Path, // Relative path
+                            filePath: entry.Path.Replace('\\', '/'), // Ensure forward slashes
                             fileHash: hash,
                             fileSize: blob.Size,
                             modifiedDate: gitCommit.Author.When.DateTime,
@@ -286,7 +312,30 @@ namespace Linage.Core
             return linageCommit;
         }
 
-        private void ImportRemote(LibGit2Sharp.Remote gitRemote, Guid projectId)
+        /// <summary>
+        /// Recursively flattens a Git tree to get all blob entries (files) including those in subdirectories.
+        /// </summary>
+        private IEnumerable<TreeEntry> FlattenTree(Tree tree)
+        {
+            foreach (var entry in tree)
+            {
+                if (entry.TargetType == TreeEntryTargetType.Blob)
+                {
+                    yield return entry;
+                }
+                else if (entry.TargetType == TreeEntryTargetType.Tree)
+                {
+                    // Recursively flatten subdirectory
+                    var subTree = (Tree)entry.Target;
+                    foreach (var subEntry in FlattenTree(subTree))
+                    {
+                        yield return subEntry;
+                    }
+                }
+            }
+        }
+
+        private async Task ImportRemoteAsync(LibGit2Sharp.Remote gitRemote, Guid projectId)
         {
             var protocol = gitRemote.Url.StartsWith("https://") 
                 ? RemoteProtocol.HTTPS 
@@ -301,14 +350,14 @@ namespace Linage.Core
                 ProjectId = projectId  // Set the foreign key
             };
 
-            _metadataStore.SaveRemote(remote);
+            await _metadataStore.SaveRemoteAsync(remote);
         }
 
         /// <summary>
         /// Quick import - only import HEAD commit and current files.
         /// Faster for large repos.
         /// </summary>
-        public ImportResult QuickImport(string gitRepoPath)
+        public async Task<ImportResult> QuickImportAsync(string gitRepoPath)
         {
             if (!Repository.IsValid(gitRepoPath))
                 throw new ArgumentException($"Not a valid Git repository: {gitRepoPath}");
@@ -322,6 +371,12 @@ namespace Linage.Core
                 if (!Directory.Exists(linageDir))
                     Directory.CreateDirectory(linageDir);
 
+                // Create .linageignore file from .gitignore (if it doesn't exist)
+                if (!GitignoreParser.LinageignoreExists(gitRepoPath))
+                {
+                    GitignoreParser.CreateLinageignoreFromGitignore(gitRepoPath);
+                }
+
                 _fileService.InitializeBlobStore(gitRepoPath);
 
                 // Create Project entity
@@ -332,7 +387,7 @@ namespace Linage.Core
                     RepositoryPath = gitRepoPath,
                     CreatedDate = DateTime.Now
                 };
-                _metadataStore.SaveProject(project);
+                await _metadataStore.SaveProjectAsync(project);
 
                 using (var repo = new Repository(gitRepoPath))
                 {
@@ -344,14 +399,14 @@ namespace Linage.Core
                         var linageCommit = ConvertCommit(head.Tip, gitRepoPath, commitMap);
                         
                         // Check if branch exists
-                        var branch = _graphService.GetBranch(head.FriendlyName);
+                        var branch = await _graphService.GetBranchAsync(head.FriendlyName);
                         if (branch == null)
                         {
-                            branch = _graphService.CreateBranch(head.FriendlyName);
+                            branch = await _graphService.CreateBranchAsync(head.FriendlyName);
                             result.BranchesImported = 1;
                         }
                         
-                        _graphService.AddCommit(linageCommit);
+                        await _graphService.AddCommitAsync(linageCommit);
                         branch.MoveHead(linageCommit);
 
                         result.CommitsImported = 1;
@@ -360,7 +415,7 @@ namespace Linage.Core
                     // Import remotes
                     foreach (var remote in repo.Network.Remotes)
                     {
-                        ImportRemote(remote, project.ProjectId);
+                        await ImportRemoteAsync(remote, project.ProjectId);
                         result.RemotesImported++;
                     }
 

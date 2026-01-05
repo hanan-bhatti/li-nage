@@ -46,6 +46,7 @@ namespace Linage.GUI
         {
             InitializeComponent();
             ApplyTheme();
+            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "ConflictResolutionView.cs");
         }
         
         private void InitializeComponent()

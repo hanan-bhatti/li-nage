@@ -125,7 +125,7 @@ namespace Linage.Infrastructure
         {
             return await _context.Commits
                 .Include(c => c.Parents)
-                .Include(c => c.Snapshot)
+                .Include(c => c.Snapshot.Files)
                 .ToListAsync()
                 .ConfigureAwait(false);
         }
@@ -150,7 +150,7 @@ namespace Linage.Infrastructure
 
             return await _context.Commits
                 .Include(c => c.Parents)
-                .Include(c => c.Snapshot)
+                .Include(c => c.Snapshot.Files)
                 .Where(c => c.AuthorName == authorName)
                 .OrderByDescending(c => c.Timestamp)
                 .ToListAsync()
@@ -179,7 +179,7 @@ namespace Linage.Infrastructure
 
             return await _context.Commits
                 .Include(c => c.Parents)
-                .Include(c => c.Snapshot)
+                .Include(c => c.Snapshot.Files)
                 .Where(c => c.Timestamp >= startDate && c.Timestamp <= endDate)
                 .OrderByDescending(c => c.Timestamp)
                 .ToListAsync()
@@ -313,7 +313,7 @@ namespace Linage.Infrastructure
         }
 
         /// <summary>
-        /// Asynchronously get a branch by name with eager loading of head commit
+        /// Asynchronously get a branch by name with eager loading of head commit and snapshot
         /// </summary>
         public async Task<Branch> GetBranchAsync(string branchName)
         {
@@ -322,6 +322,7 @@ namespace Linage.Infrastructure
 
             return await _context.Branches
                 .Include(b => b.HeadCommit)
+                .Include(b => b.HeadCommit.Snapshot.Files)
                 .FirstOrDefaultAsync(b => b.BranchName == branchName)
                 .ConfigureAwait(false);
         }
@@ -334,16 +335,18 @@ namespace Linage.Infrastructure
         {
             return _context.Branches
                 .Include(b => b.HeadCommit)
+                .Include(b => b.HeadCommit.Snapshot.Files)
                 .FirstOrDefault(b => b.BranchName == branchName);
         }
 
         /// <summary>
-        /// Asynchronously get all branches with eager loading of head commits
+        /// Asynchronously get all branches with eager loading of head commits and their snapshots
         /// </summary>
         public async Task<List<Branch>> GetAllBranchesAsync()
         {
             return await _context.Branches
                 .Include(b => b.HeadCommit)
+                .Include(b => b.HeadCommit.Snapshot.Files)
                 .ToListAsync()
                 .ConfigureAwait(false);
         }
@@ -356,6 +359,7 @@ namespace Linage.Infrastructure
         {
             return _context.Branches
                 .Include(b => b.HeadCommit)
+                .Include(b => b.HeadCommit.Snapshot.Files)
                 .ToList();
         }
 

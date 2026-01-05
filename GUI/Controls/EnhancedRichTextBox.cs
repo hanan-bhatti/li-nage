@@ -15,8 +15,10 @@ namespace Linage.GUI.Controls
 
         protected override void WndProc(ref Message m)
         {
+            // MUST call base first to ensure default rendering happens
             base.WndProc(ref m);
 
+            // Then raise events
             if (m.Msg == WM_VSCROLL || m.Msg == WM_MOUSEWHEEL)
             {
                 VScrollHappened?.Invoke(this, EventArgs.Empty);

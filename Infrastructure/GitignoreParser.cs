@@ -7,8 +7,9 @@ using System.Text.RegularExpressions;
 namespace Linage.Infrastructure
 {
     /// <summary>
-    /// Parser for .gitignore files with full pattern matching support......
-    /// Supports glob patterns, negation, directory-specific rules, and comments...
+    /// Parser for .gitignore and .linageignore files with full pattern matching support.
+    /// Supports glob patterns, negation, directory-specific rules, and comments.
+    /// .linageignore takes precedence over .gitignore.
     /// </summary>
     public class GitignoreParser
     {
@@ -23,16 +24,93 @@ namespace Linage.Infrastructure
         /// <summary>
         /// Load patterns from a .gitignore file.
         /// </summary>
-        public void LoadFromFile(string gitignorePath)
+        public void LoadFromFile(string ignorePath)
         {
-            if (!File.Exists(gitignorePath))
+            if (!File.Exists(ignorePath))
                 return;
 
-            var lines = File.ReadAllLines(gitignorePath);
+            var lines = File.ReadAllLines(ignorePath);
             foreach (var line in lines)
             {
                 AddPattern(line);
             }
+        }
+
+        /// <summary>
+        /// Load both .gitignore and .linageignore files.
+        /// .linageignore patterns are loaded after .gitignore (higher priority).
+        /// </summary>
+        public void LoadAllIgnoreFiles()
+        {
+            // Load .gitignore first (lower priority)
+            var gitignorePath = Path.Combine(_basePath, ".gitignore");
+            if (File.Exists(gitignorePath))
+            {
+                LoadFromFile(gitignorePath);
+            }
+
+            // Load .linageignore second (higher priority - overrides .gitignore)
+            var linageignorePath = Path.Combine(_basePath, ".linageignore");
+            if (File.Exists(linageignorePath))
+            {
+                LoadFromFile(linageignorePath);
+            }
+        }
+
+        /// <summary>
+        /// Creates a .linageignore file by copying patterns from .gitignore
+        /// and adding Li'nage-specific patterns.
+        /// </summary>
+        public static void CreateLinageignoreFromGitignore(string repoPath)
+        {
+            var gitignorePath = Path.Combine(repoPath, ".gitignore");
+            var linageignorePath = Path.Combine(repoPath, ".linageignore");
+
+            var patterns = new List<string>
+            {
+                "# Li'nage ignore file",
+                "# This file works like .gitignore but is specific to Li'nage",
+                "# Patterns here override .gitignore patterns",
+                "",
+                "# Li'nage metadata (always ignored)",
+                ".linage/",
+                "",
+                "# Git metadata (always ignored)",
+                ".git/",
+                ""
+            };
+
+            // Copy patterns from .gitignore if it exists
+            if (File.Exists(gitignorePath))
+            {
+                patterns.Add("# Patterns imported from .gitignore:");
+                var gitignoreLines = File.ReadAllLines(gitignorePath);
+                foreach (var line in gitignoreLines)
+                {
+                    // Skip comments and empty lines (we'll add our own header)
+                    var trimmed = line.Trim();
+                    if (!string.IsNullOrEmpty(trimmed) && !trimmed.StartsWith("#"))
+                    {
+                        patterns.Add(line);
+                    }
+                }
+            }
+            else
+            {
+                // Add common default patterns if no .gitignore exists
+                patterns.Add("# Common ignore patterns:");
+                patterns.AddRange(GetDefaultPatterns());
+            }
+
+            File.WriteAllLines(linageignorePath, patterns);
+        }
+
+        /// <summary>
+        /// Check if .linageignore exists in the repository.
+        /// </summary>
+        public static bool LinageignoreExists(string repoPath)
+        {
+            return File.Exists(Path.Combine(repoPath, ".linageignore"));
         }
 
         /// <summary>

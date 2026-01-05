@@ -1,18 +1,100 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using Linage.Infrastructure;
+using Linage.GUI.Theme;
 
 namespace Linage.GUI
 {
-    public class DebugView : UserControl
+    public class DebugView : UserControl, IThemable
     {
         private RichTextBox _logBox;
+
+        public void ApplyTheme()
+        {
+            // Debug view might want to keep its specific look or adapt
+            // For now, let's make it adapt but keep green text?
+            // Actually let's make it follow theme but maybe Monospace
+            
+            if (_logBox != null)
+            {
+                _logBox.BackColor = ModernTheme.BackColor;
+                _logBox.ForeColor = ModernTheme.SuccessColor; // Keep it matrix-y or use text primary?
+                _logBox.Font = ModernTheme.FontCode;
+            }
+        }
+
         private Timer _refreshTimer;
 
         public DebugView()
         {
             InitializeComponent();
             SetupTimer();
+            SubscribeToDebugLogger();
+            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "DebugView.cs");
+        }
+
+        private void SubscribeToDebugLogger()
+        {
+            DebugLogger.OnMessage += (message, level) =>
+            {
+                string prefix = GetLevelPrefix(level);
+                Color color = GetLevelColor(level);
+                AppendColoredLog(prefix, message, color);
+            };
+        }
+
+        private string GetLevelPrefix(DebugLevel level)
+        {
+            switch (level)
+            {
+                case DebugLevel.Trace: return "[TRACE]";
+                case DebugLevel.Info: return "[INFO]";
+                case DebugLevel.Warning: return "[WARN]";
+                case DebugLevel.Error: return "[ERROR]";
+                default: return "[LOG]";
+            }
+        }
+
+        private Color GetLevelColor(DebugLevel level)
+        {
+            switch (level)
+            {
+                case DebugLevel.Trace: return Color.Gray;
+                case DebugLevel.Info: return Color.LimeGreen;
+                case DebugLevel.Warning: return Color.Yellow;
+                case DebugLevel.Error: return Color.Red;
+                default: return Color.LimeGreen;
+            }
+        }
+
+        private void AppendColoredLog(string prefix, string message, Color color)
+        {
+            if (_logBox.InvokeRequired)
+            {
+                _logBox.Invoke(new Action<string, string, Color>(AppendColoredLog), prefix, message, color);
+            }
+            else
+            {
+                var timestamp = DateTime.Now.ToString("HH:mm:ss");
+
+                // Add timestamp in default color
+                _logBox.SelectionStart = _logBox.TextLength;
+                _logBox.SelectionColor = Color.Gray;
+                _logBox.AppendText($"[{timestamp}] ");
+
+                // Add level prefix in level color
+                _logBox.SelectionStart = _logBox.TextLength;
+                _logBox.SelectionColor = color;
+                _logBox.AppendText($"{prefix} ");
+
+                // Add message in default color
+                _logBox.SelectionStart = _logBox.TextLength;
+                _logBox.SelectionColor = Color.LimeGreen;
+                _logBox.AppendText($"{message}\n");
+
+                _logBox.ScrollToCaret();
+            }
         }
 
         private void InitializeComponent()

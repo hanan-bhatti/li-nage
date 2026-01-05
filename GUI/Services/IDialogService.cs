@@ -92,17 +92,17 @@ namespace Linage.GUI.Services
 
         public void ShowError(string title, string message)
         {
-            MessageBox.Show(message, title, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            Linage.Infrastructure.Services.NotificationManager.Instance.ShowError(title, message);
         }
 
         public void ShowInfo(string title, string message)
         {
-            MessageBox.Show(message, title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            Linage.Infrastructure.Services.NotificationManager.Instance.Show(title, message, Linage.Core.Notifications.NotificationSeverity.Info);
         }
 
         public void ShowWarning(string title, string message)
         {
-            MessageBox.Show(message, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            Linage.Infrastructure.Services.NotificationManager.Instance.ShowWarning(title, message);
         }
     }
 }

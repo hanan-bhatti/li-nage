@@ -9,12 +9,33 @@
   <component name="ChangeListManager">
     <list default="true" id="32c24d99-153a-4c9b-83ae-d754e5bf46c9" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.li'nage.dir/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.li'nage.dir/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Docs/GEMINI_PHASE4_REPORT.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Docs/IMPLEMENTATION_COMPLETE.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Docs/QUICK_REFERENCE.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Controllers/RemoteController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/RemoteController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Controllers/ScanController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/ScanController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Controllers/SyncController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/SyncController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Controllers/VersionController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/VersionController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/AIActivityService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/AIActivityService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/ChangeDetector.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/ChangeDetector.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/GitImportService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/GitImportService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/HashService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/HashService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/RecoveryManager_New.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/RecoveryManager_New.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/RemoteService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/RemoteService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/Services/RemoteOperationsService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Services/RemoteOperationsService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/VersionGraphService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/VersionGraphService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Docs/codebase_analysis.md" beforeDir="false" afterPath="$PROJECT_DIR$/Docs/codebase_analysis.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Folder.DotSettings.user" beforeDir="false" afterPath="$PROJECT_DIR$/Folder.DotSettings.user" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/GEMINI.md" beforeDir="false" afterPath="$PROJECT_DIR$/GEMINI.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/GUI/Controls/ModernControls.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Controls/ModernControls.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/GUI/Dialogs/ProgressDialog.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Dialogs/ProgressDialog.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/GUI/EditorView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/EditorView.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/GUI/FileExplorerView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/FileExplorerView.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/GUI/GitGraphView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/GitGraphView.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/GUI/Helpers/NativeMethods.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Helpers/NativeMethods.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/GUI/MainWindow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/MainWindow.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/GUI/Theme/ModernTheme.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Theme/ModernTheme.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Infrastructure/FileService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Infrastructure/FileService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Infrastructure/GitignoreParser.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Infrastructure/GitignoreParser.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Infrastructure/HttpTransport.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Infrastructure/SshTransport.cs" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -32,6 +53,7 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="HighlightingSettingsPerFile">
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/7019dab993da41e0a0259a4be7d6aa69531820/09/32ab8be1/NullReferenceException.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Controllers/IndexController.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Controllers/ScanController.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Controllers/VersionController.cs" root0="FORCE_HIGHLIGHTING" />
@@ -125,7 +147,7 @@
       <workItem from="1767115128224" duration="282000" />
       <workItem from="1767121842986" duration="7528000" />
       <workItem from="1767174786089" duration="616000" />
-      <workItem from="1767279812569" duration="6917000" />
+      <workItem from="1767279812569" duration="15208000" />
     </task>
     <servers />
   </component>

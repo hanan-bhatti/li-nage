@@ -45,7 +45,7 @@ namespace Linage.Core.Services
         /// <param name="remoteUrl">Remote repository URL</param>
         /// <param name="branchName">Branch to push (null for current branch)</param>
         /// <returns>Operation result</returns>
-        public async Task<RemoteOperationResult> PushAsync(string remoteUrl, string branchName = null)
+        public async Task<RemoteOperationResult> PushAsync(string remoteUrl, string localRepoPath, string branchName = null)
         {
             if (string.IsNullOrEmpty(remoteUrl))
                 return RemoteOperationResult.Failure("Remote URL is required");
@@ -63,7 +63,7 @@ namespace Linage.Core.Services
                 }
 
                 var remote = CreateRemoteFromUrl(remoteUrl);
-                await _remoteController.Push(remote, branchName).ConfigureAwait(false);
+                await _remoteController.Push(remote, branchName, localRepoPath).ConfigureAwait(false);
 
                 return RemoteOperationResult.Success($"Successfully pushed to {remoteUrl}");
             }
@@ -79,7 +79,7 @@ namespace Linage.Core.Services
         /// <param name="remoteUrl">Remote repository URL</param>
         /// <param name="branchName">Branch to pull (null for current branch)</param>
         /// <returns>Operation result</returns>
-        public async Task<RemoteOperationResult> PullAsync(string remoteUrl, string branchName = null)
+        public async Task<RemoteOperationResult> PullAsync(string remoteUrl, string localRepoPath, string branchName = null)
         {
             if (string.IsNullOrEmpty(remoteUrl))
                 return RemoteOperationResult.Failure("Remote URL is required");
@@ -97,7 +97,7 @@ namespace Linage.Core.Services
                 }
 
                 var remote = CreateRemoteFromUrl(remoteUrl);
-                await _remoteController.Pull(remote, branchName).ConfigureAwait(false);
+                await _remoteController.Pull(remote, branchName, localRepoPath).ConfigureAwait(false);
 
                 return RemoteOperationResult.Success($"Successfully pulled from {remoteUrl}");
             }

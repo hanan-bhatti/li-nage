@@ -75,6 +75,8 @@ namespace Linage.GUI
             _timer = new Timer { Interval = durationMs };
             _timer.Tick += (s, e) => Close();
             _timer.Start();
+
+            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "NotificationService.cs");
         }
 
         private void InitializeComponent(string message)

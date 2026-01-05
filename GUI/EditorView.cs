@@ -15,27 +15,71 @@ using Linage.GUI.Theme;
 
 namespace Linage.GUI
 {
-    public class EditorView : UserControl
+    public class EditorView : UserControl, IThemable
     {
-        private SplitContainer _mainContainer;
-        private Panel _editorContainer;
-        private Panel _gutter; // Changed to Panel for custom painting
-        private EnhancedRichTextBox _codeEditor;
-        private DataGridView _lineHistoryGrid;
-        private Label _lblCurrentFile;
-        private Panel _searchPanel;
-        private TextBox _txtSearch;
-        
-        private string _currentFilePath;
-        private bool _isDirty;
-        private int _lastLineCount = 0;
-        private SyntaxHighlighter _highlighter;
-        private Timer _typingTimer; // Debounce for heavier highlighting if needed
-        private VersionController _versionController;
-        private string _repositoryRoot;
+        // ... (existing fields)
 
-        public event EventHandler ContentChanged;
+        public void ApplyTheme()
+        {
+            this.BackColor = ModernTheme.BackColor;
+            
+            if (_editorContainer != null)
+                _editorContainer.BackColor = ModernTheme.BackColor;
+
+            if (_lblCurrentFile != null)
+            {
+                _lblCurrentFile.ForeColor = ModernTheme.TextSecondary;
+                _lblCurrentFile.BackColor = ModernTheme.SurfaceColor;
+                _lblCurrentFile.Font = ModernTheme.MainFont;
+            }
+
+            if (_codeEditor != null)
+            {
+                _codeEditor.BackColor = ModernTheme.BackColor;
+                _codeEditor.ForeColor = ModernTheme.TextPrimary;
+                _codeEditor.SelectionColor = ModernTheme.TextPrimary;
+                _codeEditor.Font = ModernTheme.CodeFont;
+            }
+
+            if (_lineHistoryGrid != null)
+            {
+                _lineHistoryGrid.BackgroundColor = ModernTheme.SurfaceColor;
+                _lineHistoryGrid.GridColor = ModernTheme.BorderColor;
+                
+                _lineHistoryGrid.ColumnHeadersDefaultCellStyle.BackColor = ModernTheme.SurfaceColor;
+                _lineHistoryGrid.ColumnHeadersDefaultCellStyle.ForeColor = ModernTheme.TextSecondary;
+                _lineHistoryGrid.ColumnHeadersDefaultCellStyle.Font = ModernTheme.MainFont;
+                
+                _lineHistoryGrid.DefaultCellStyle.BackColor = ModernTheme.SurfaceColor;
+                _lineHistoryGrid.DefaultCellStyle.ForeColor = ModernTheme.TextSecondary;
+                _lineHistoryGrid.DefaultCellStyle.Font = ModernTheme.MainFont;
+                _lineHistoryGrid.DefaultCellStyle.SelectionBackColor = ModernTheme.SurfaceLight;
+            }
+            
+            // Re-highlight syntax if needed or just let it update naturally on edit
+            // _highlighter?.ReapplyTheme(); // If highlighter supports it
+        }
+
+        // ... (rest of class)
+        private Panel _editorContainer;
+                private EnhancedRichTextBox _codeEditor;
+                private DataGridView _lineHistoryGrid;
+                private Label _lblCurrentFile;
+                private Panel _searchPanel;
+                
+        // Missing Fields
+        private TextBox _txtSearch;
+        private string _currentFilePath;
+        private string _repositoryRoot;
+        private VersionController _versionController;
+        private SyntaxHighlighter _highlighter;
+        private Timer _typingTimer;
+        private int _lastLineCount;
+        private bool _isDirty;
+
+        // Events
         public event EventHandler FileSaved;
+        public event EventHandler ContentChanged;
 
         public bool IsDirty
         {
@@ -46,92 +90,22 @@ namespace Linage.GUI
                 {
                     _isDirty = value;
                     ContentChanged?.Invoke(this, EventArgs.Empty);
-                    _lblCurrentFile.Text = (_isDirty ? "● " : "") + 
-                                         (_currentFilePath != null ? Path.GetFileName(_currentFilePath) : "Untitled");
                 }
             }
         }
-
-        public EditorView()
+                
+                // ...
+        
+                public EditorView()
         {
             InitializeComponent();
-            SetupSearchPanel();
-            
-            // Enable Double Buffering on Gutter Panel to remove flicker
-            typeof(Panel).InvokeMember("DoubleBuffered", 
-                System.Reflection.BindingFlags.SetProperty | 
-                System.Reflection.BindingFlags.Instance | 
-                System.Reflection.BindingFlags.NonPublic, 
-                null, _gutter, new object[] { true });
-
-            _highlighter = new SyntaxHighlighter(_codeEditor);
-            
-            _typingTimer = new Timer { Interval = 500 };
-            _typingTimer.Tick += async (s, e) =>
-            {
-                _typingTimer.Stop();
-                if (_isHighlighting) return;
-
-                try
-                {
-                    // Calculate visible range
-                    int firstChar = _codeEditor.GetCharIndexFromPosition(new Point(0, 0));
-                    int lastChar = _codeEditor.GetCharIndexFromPosition(new Point(_codeEditor.Width, _codeEditor.Height));
-                    
-                    int start = Math.Max(0, firstChar - 1000); // Reduced buffer for speed
-                    int end = Math.Min(_codeEditor.TextLength, lastChar + 1000);
-                    int length = end - start;
-                    
-                    if (length > 0)
-                    {
-                        string visibleText = _codeEditor.Text.Substring(start, length);
-                        
-                        // Parse on background thread
-                        var tokens = await _highlighter.ParseAsync(visibleText, start);
-                        
-                        // Apply on UI thread with Guard
-                        if (!_codeEditor.IsDisposed)
-                        {
-                            _isHighlighting = true;
-                            try { _highlighter.ApplyTokens(tokens, start, length); }
-                            finally { _isHighlighting = false; }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Highlight error: " + ex.Message); 
-                }
-            };
+            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "EditorView.cs");
         }
 
         private void InitializeComponent()
         {
             this.BackColor = ModernTheme.BackColor;
-
-            // 1. Top Bar (File Info)
-            _lblCurrentFile = new Label
-            {
-                Dock = DockStyle.Top,
-                Height = 30,
-                BackColor = ModernTheme.SurfaceColor,
-                ForeColor = ModernTheme.TextPrimary,
-                Text = "No file open",
-                TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(10, 0, 0, 0),
-                Font = new Font(ModernTheme.MainFont.FontFamily, 9f, FontStyle.Bold)
-            };
-
-            // 2. Main Split Container
-            _mainContainer = new SplitContainer
-            {
-                Dock = DockStyle.Fill,
-                Orientation = Orientation.Vertical,
-                SplitterDistance = 800,
-                BackColor = ModernTheme.SplitterColor,
-                SplitterWidth = 2
-            };
-
+            
             // 3. Editor Container
             _editorContainer = new Panel
             {
@@ -139,53 +113,84 @@ namespace Linage.GUI
                 BackColor = ModernTheme.BackColor
             };
 
-            // Gutter (Line Numbers)
-            _gutter = new Panel
+            // Top Label
+            _lblCurrentFile = new Label
             {
-                Dock = DockStyle.Left,
-                Width = 50,
+                Dock = DockStyle.Top,
+                Height = 30,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(10, 0, 0, 0),
+                Font = ModernTheme.MainFont,
+                ForeColor = ModernTheme.TextSecondary,
                 BackColor = ModernTheme.SurfaceColor,
+                Text = "No file open"
             };
-            _gutter.Paint += OnGutterPaint;
+            _editorContainer.Controls.Add(_lblCurrentFile); // Top label first
+
+            // Initialize History Grid
+            InitializeHistoryGrid();
+
+            // Split Container for Code and History
+            var splitContainer = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Vertical,
+                SplitterDistance = 800, // Default width for code
+                SplitterWidth = 4,
+                FixedPanel = FixedPanel.Panel2 // Keep history panel size fixed
+            };
+            splitContainer.BackColor = ModernTheme.SplitterColor;
+            splitContainer.Panel1.BackColor = ModernTheme.BackColor;
+            splitContainer.Panel2.BackColor = ModernTheme.SurfaceColor;
 
             // Code Editor
             _codeEditor = new EnhancedRichTextBox
             {
                 Dock = DockStyle.Fill,
+                Font = ModernTheme.CodeFont,
                 WordWrap = false,
                 BackColor = ModernTheme.BackColor,
                 ForeColor = ModernTheme.TextPrimary,
                 BorderStyle = BorderStyle.None,
                 AcceptsTab = true,
-                ScrollBars = RichTextBoxScrollBars.Vertical // Force vertical only usually helps sync
+                ScrollBars = RichTextBoxScrollBars.Vertical // Use native scrollbar
             };
             
-            try { _codeEditor.Font = ModernTheme.CodeFont; } catch { /* Fallback handled by control default */ }
+            // Ensure text is visible by setting selection colors
+            _codeEditor.SelectionColor = ModernTheme.TextPrimary;
             
             _codeEditor.TextChanged += OnTextChanged;
+            _codeEditor.SelectionChanged += (s, e) => UpdateLineHistory();
             
-            // Sync Logic: Immediate Update
-            _codeEditor.VScrollHappened += (s, e) => _gutter.Invalidate(); 
-            _codeEditor.PaintHappened += (s, e) => _gutter.Invalidate();
-            
-            _codeEditor.Resize += (s, e) => _gutter.Invalidate();
-            _codeEditor.SelectionChanged += (s, e) => {
-                _gutter.Invalidate(); 
-                UpdateLineHistory();
+            // No gutter - simplified for performance
+            _codeEditor.VScrollHappened += (s, e) => {
+                    // No-op
+            };
+            _codeEditor.Resize += (s, e) => {
+                    // No-op
             };
             
-            _editorContainer.Controls.Add(_codeEditor);
-            _editorContainer.Controls.Add(_gutter);
+            // Add controls to split container
+            splitContainer.Panel1.Controls.Add(_codeEditor);
+            splitContainer.Panel2.Controls.Add(_lineHistoryGrid);
+            
+            _editorContainer.Controls.Add(splitContainer); // Fill control last 
 
-            // 4. Line History Grid
-            InitializeHistoryGrid();
-
-            _mainContainer.Panel1.Controls.Add(_editorContainer);
-            _mainContainer.Panel2.Controls.Add(_lineHistoryGrid);
-
-            this.Controls.Add(_mainContainer);
-            this.Controls.Add(_lblCurrentFile);
+            // Initialize Helpers
+            _highlighter = new SyntaxHighlighter(_codeEditor);
+            _typingTimer = new Timer { Interval = 500 };
+            _typingTimer.Tick += (s, e) => { _typingTimer.Stop(); };
+            
+            // CRITICAL: Add the editor container to this UserControl
+            this.Controls.Add(_editorContainer);
+            
+            // Setup Search Panel (after _codeEditor is created)
+            SetupSearchPanel();
         }
+                    
+                            // ...
+                    
+        // --- Gutter Logic ---
 
         private void InitializeHistoryGrid()
         {
@@ -258,63 +263,6 @@ namespace Linage.GUI
             _codeEditor.Controls.Add(_searchPanel); 
         }
 
-        // --- Gutter Logic ---
-
-        private void OnGutterPaint(object sender, PaintEventArgs e)
-        {
-            // Fast Line Number Rendering
-            e.Graphics.Clear(ModernTheme.SurfaceColor);
-            
-            // Get visible range
-            // Optimisation: GetCharIndexFromPosition(0,0) gives first visible char
-            int firstCharIndex = _codeEditor.GetCharIndexFromPosition(new Point(0, 0));
-            int firstLine = _codeEditor.GetLineFromCharIndex(firstCharIndex);
-            
-            // Get last visible line roughly
-            int lastCharIndex = _codeEditor.GetCharIndexFromPosition(new Point(0, _codeEditor.Height));
-            int lastLine = _codeEditor.GetLineFromCharIndex(lastCharIndex);
-            if (lastLine < 0) lastLine = _codeEditor.Lines.Length - 1;
-
-            // We need precise Y position of the first line
-            Point firstPos = _codeEditor.GetPositionFromCharIndex(firstCharIndex);
-            
-            using (var brush = new SolidBrush(ModernTheme.TextSecondary))
-            using (var currentLineBrush = new SolidBrush(ModernTheme.TextPrimary))
-            {
-                var font = _codeEditor.Font; // Do NOT dispose this! It belongs to the control.
-                
-                int currentLine = _codeEditor.GetLineFromCharIndex(_codeEditor.SelectionStart);
-                int y = firstPos.Y;
-                
-                // We assume constant line height for speed, but fallback to GetPosition if needed
-                // Using GetPosition inside loop is slow. 
-                // Let's measure line height once.
-                int lineHeight = TextRenderer.MeasureText("W", font).Height; 
-                // Note: RichTextBox line height might vary slightly due to RTF, but usually constant for code.
-                // Better approach: GetPosition for first, then add offset? 
-                // No, safest is GetPosition for each line in visible range. It's fast enough for ~50 lines.
-                
-                for (int i = firstLine; i <= lastLine + 1; i++) // +1 just in case
-                {
-                    if (i >= _codeEditor.Lines.Length) break;
-
-                    // This call is the most expensive part, but essential for correct sync
-                    Point linePos = _codeEditor.GetPositionFromCharIndex(_codeEditor.GetFirstCharIndexFromLine(i));
-                    
-                    if (linePos.Y > _codeEditor.Height) break;
-                    if (linePos.Y < -lineHeight) continue;
-
-                    var b = (i == currentLine) ? currentLineBrush : brush;
-                    e.Graphics.DrawString((i + 1).ToString(), font, b, new PointF(5, linePos.Y));
-                }
-            }
-            
-            using (var pen = new Pen(ModernTheme.BorderColor))
-            {
-                e.Graphics.DrawLine(pen, _gutter.Width - 1, 0, _gutter.Width - 1, _gutter.Height);
-            }
-        }
-
         // --- File Operations ---
 
         public async Task LoadFile(string filePath)
@@ -331,6 +279,13 @@ namespace Linage.GUI
                 _codeEditor.TextChanged -= OnTextChanged;
                 _codeEditor.Text = content;
                 
+                // Ensure all text is visible with correct color
+                _codeEditor.SelectionStart = 0;
+                _codeEditor.SelectionLength = _codeEditor.TextLength;
+                _codeEditor.SelectionColor = ModernTheme.TextPrimary;
+                _codeEditor.SelectionStart = 0;
+                _codeEditor.SelectionLength = 0;
+                
                 // Full Highlight on Load (Async)
                 _isHighlighting = true;
                 try { await _highlighter.HighlightAllAsync(); }
@@ -340,7 +295,6 @@ namespace Linage.GUI
                 
                 IsDirty = false;
                 _lastLineCount = _codeEditor.Lines.Length;
-                _gutter.Invalidate();
             }
             catch (Exception ex)
             {
@@ -381,7 +335,6 @@ namespace Linage.GUI
             if (_codeEditor.Lines.Length != _lastLineCount)
             {
                 _lastLineCount = _codeEditor.Lines.Length;
-                _gutter.Invalidate();
             }
 
             // Highlighting Strategy:
@@ -441,6 +394,10 @@ namespace Linage.GUI
 
         private void UpdateLineHistory()
         {
+            // Guard against null reference - grid may not be initialized
+            if (_lineHistoryGrid == null)
+                return;
+                
             _lineHistoryGrid.Rows.Clear();
 
             if (_versionController == null || string.IsNullOrEmpty(_currentFilePath))

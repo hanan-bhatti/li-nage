@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Linage.Core;
@@ -14,19 +15,6 @@ namespace Linage.Controllers
         public string GetStatus()
         {
             return Status;
-        }
-
-        [Obsolete("Use ScanChangesAsync for better UI responsiveness")]
-        public void ScanChanges()
-        {
-            if (ChangeDetector == null || GraphService == null) return;
-
-            var head = GraphService.GetCurrentBranch()?.HeadCommit;
-
-            if (!string.IsNullOrEmpty(_currentRootPath))
-            {
-                ChangeDetector.ScanForChanges(_currentRootPath, head, _fileService);
-            }
         }
 
         /// <summary>
@@ -62,19 +50,30 @@ namespace Linage.Controllers
         public VersionController()
         {
             // Production Dependency Injection Root
-            var dbContext = new LiNageDbContext();
-            
-            _metadataStore = new MetadataStore(dbContext);
-            _hashService = new HashService();
-            _fileService = new FileService(_hashService);
-            GraphService = new VersionGraphService(_metadataStore);
-            
-            // Phase 3 Integration
-            _credentialStore = new CredentialStore();
-            AuthService = new AuthenticationService(_credentialStore);
-            _authController = new AuthController(AuthService);
-            
-            RemoteService = new RemoteService(_metadataStore);
+            try
+            {
+                var dbContext = new LiNageDbContext();
+                
+                _metadataStore = new MetadataStore(dbContext);
+                _hashService = new HashService();
+                _fileService = new FileService(_hashService);
+                GraphService = new VersionGraphService(_metadataStore);
+                
+                // Phase 3 Integration
+                _credentialStore = new CredentialStore();
+                AuthService = new AuthenticationService(_credentialStore);
+                _authController = new AuthController(AuthService);
+                
+                RemoteService = new RemoteService(_metadataStore);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(
+                    "Failed to initialize database context. Ensure SQL Server is running and configured properly. " +
+                    "Check the connection string in App.config (LinageDbContext). " +
+                    "If using LocalDB, verify it's installed and the service is running.",
+                    ex);
+            }
         }
 
         public GitImportService CreateGitImporter()
@@ -82,7 +81,7 @@ namespace Linage.Controllers
             return new GitImportService(_metadataStore, _hashService, _fileService, GraphService);
         }
 
-        public void LoadProject(string rootPath)
+        public async Task LoadProjectAsync(string rootPath)
         {
             if (string.IsNullOrEmpty(rootPath)) return;
             _currentRootPath = rootPath;
@@ -92,39 +91,40 @@ namespace Linage.Controllers
 
             // Inject FileService into GraphService for merge operations
             GraphService.SetFileService(_fileService);
+            
+            // Initialize GraphService (async loading of commits)
+            await GraphService.InitializeAsync();
 
             // Re-initialize transports with the correct path
             // (In a more complex DI setup this would be handled differently)
 
-            // Initialize custom Li'nage transports with correct path
-            var httpTransport = new LinageHttpTransport(AuthService, rootPath);
-            var sshTransport = new LinageSshTransport(AuthService, rootPath);
-            _remoteController = new RemoteController(httpTransport, sshTransport, _authController);
+            // Initialize RemoteController with AuthController
+            _remoteController = new RemoteController(_authController);
 
             ChangeDetector = new ChangeDetector(rootPath);
             ChangeDetector.StartMonitoring();
 
             // Load existing branches and commits from database
-            var branches = GraphService.GetAllBranches();
+            var branches = await GraphService.GetAllBranchesAsync();
             if (branches != null && branches.Count > 0)
             {
                 // Try to load 'main' branch first, fallback to 'master', then first available
-                var mainBranch = GraphService.GetBranch("main");
+                var mainBranch = await GraphService.GetBranchAsync("main");
                 if (mainBranch != null)
                 {
-                    GraphService.SwitchBranch("main");
+                    await GraphService.SwitchBranchAsync("main");
                 }
                 else
                 {
-                    var masterBranch = GraphService.GetBranch("master");
+                    var masterBranch = await GraphService.GetBranchAsync("master");
                     if (masterBranch != null)
                     {
-                        GraphService.SwitchBranch("master");
+                        await GraphService.SwitchBranchAsync("master");
                     }
                     else if (branches.Count > 0)
                     {
                         // Switch to first available branch
-                        GraphService.SwitchBranch(branches[0].BranchName);
+                        await GraphService.SwitchBranchAsync(branches[0].BranchName);
                     }
                 }
             }
@@ -132,32 +132,67 @@ namespace Linage.Controllers
             Status = $"Loaded {rootPath}";
         }
 
-        public void CreateCommit(string message, List<string> selectedFiles)
+        public async Task CreateCommitAsync(string message, List<string> selectedFiles)
         {
+            DebugLogger.Info($"VersionController.CreateCommitAsync called");
+            DebugLogger.Info($"  -> Message: {message}");
+            DebugLogger.Info($"  -> Selected files count: {selectedFiles?.Count ?? 0}");
+
             if (GraphService.GetCurrentBranch() == null)
             {
+                DebugLogger.Trace("  -> No current branch, checking for 'main' branch");
                 // Try to get existing 'main' branch first
-                var mainBranch = GraphService.GetBranch("main");
+                var mainBranch = await GraphService.GetBranchAsync("main");
                 if (mainBranch != null)
                 {
-                    GraphService.SwitchBranch("main");
+                    DebugLogger.Trace("  -> Found 'main' branch, switching to it");
+                    await GraphService.SwitchBranchAsync("main");
                 }
                 else if (GraphService.GetCommitHistory().Count == 0)
                 {
+                    DebugLogger.Trace("  -> No commits exist, creating 'main' branch");
                     // Create 'main' only if it doesn't exist
-                    GraphService.CreateBranch("main");
-                    GraphService.SwitchBranch("main");
+                    await GraphService.CreateBranchAsync("main");
+                    await GraphService.SwitchBranchAsync("main");
                 }
             }
+
+            var currentBranch = GraphService.GetCurrentBranch();
+            DebugLogger.Info($"  -> Current branch: {currentBranch?.BranchName ?? "null"}");
 
             // Create Snapshot
             var snapshot = new Snapshot { SnapshotId = Guid.NewGuid(), Timestamp = DateTime.Now };
             snapshot.Files = new List<FileMetadata>();
 
             // Process files
+            DebugLogger.Trace("  -> Processing selected files:");
             foreach (var file in selectedFiles)
             {
-                var meta = _fileService.GetMetadata(file, ""); 
+                // file might be a relative path, construct full path
+                var fullPath = file;
+                if (!Path.IsPathRooted(file) && !string.IsNullOrEmpty(_currentRootPath))
+                {
+                    fullPath = Path.Combine(_currentRootPath, file.Replace('/', Path.DirectorySeparatorChar));
+                }
+
+                DebugLogger.Trace($"     - File: {file} -> FullPath: {fullPath}");
+
+                var meta = _fileService.GetMetadata(fullPath, _currentRootPath);
+                DebugLogger.Trace($"       Hash: {meta.FileHash}");
+
+                // Ensure FilePath is stored as relative path with forward slashes
+                if (Path.IsPathRooted(meta.FilePath) && !string.IsNullOrEmpty(_currentRootPath))
+                {
+                    var relativePath = meta.FilePath;
+                    if (meta.FilePath.StartsWith(_currentRootPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        relativePath = meta.FilePath.Substring(_currentRootPath.Length)
+                            .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    }
+                    meta.FilePath = relativePath.Replace('\\', '/');
+                }
+
+                DebugLogger.Trace($"       Stored path: {meta.FilePath}");
                 snapshot.Files.Add(meta);
             }
 
@@ -170,72 +205,107 @@ namespace Linage.Controllers
                 Timestamp = DateTime.Now,
                 Snapshot = snapshot
             };
-            
+
             commit.CommitHash = commit.CalculateHash();
-            
-            
+            DebugLogger.Info($"  -> Created commit: {commit.CommitHash.Substring(0, 8)}...");
+
+
             // Link to Parent
             var parent = GraphService.GetCurrentBranch()?.HeadCommit;
+            DebugLogger.Trace($"  -> Parent commit: {parent?.CommitHash?.Substring(0, 8) ?? "null"}...");
             if (parent != null)
             {
                 commit.Parents = new List<Commit> { parent };
-                
+
                 // Inherit files from parent snapshot
                 if (parent.Snapshot?.Files != null)
                 {
+                    DebugLogger.Trace($"  -> Parent snapshot has {parent.Snapshot.Files.Count} files");
                     // Create a dictionary for fast lookup/replacement
                     var currentFiles = new Dictionary<string, FileMetadata>(StringComparer.OrdinalIgnoreCase);
                     foreach(var f in parent.Snapshot.Files) currentFiles[f.FilePath] = f;
-                    
+
                     // Update/Add selected files
                     foreach(var sFile in snapshot.Files)
                     {
                         currentFiles[sFile.FilePath] = sFile;
                     }
-                    
+
                     // Rebuild snapshot files list with merged state
                     snapshot.Files = currentFiles.Values.ToList();
+                    DebugLogger.Trace($"  -> Final snapshot has {snapshot.Files.Count} files");
                 }
             }
-            
+
             // Add to Graph
-            GraphService.AddCommit(commit);
+            await GraphService.AddCommitAsync(commit);
+            DebugLogger.Info($"  -> Commit added to graph");
 
             // Rescan for changes after commit to clear committed files from dirty list
             if (ChangeDetector != null && !string.IsNullOrEmpty(_currentRootPath))
             {
+                DebugLogger.Info("  -> Rescanning for changes after commit...");
                 var head = GraphService.GetCurrentBranch()?.HeadCommit;
-                ChangeDetector.ScanForChanges(_currentRootPath, head, _fileService);
+                DebugLogger.Trace($"  -> New HEAD commit: {head?.CommitHash?.Substring(0, 8) ?? "null"}...");
+                DebugLogger.Trace($"  -> HEAD snapshot files count: {head?.Snapshot?.Files?.Count ?? 0}");
+
+                // Log HEAD snapshot files for comparison
+                if (head?.Snapshot?.Files != null)
+                {
+                    DebugLogger.Trace("  -> HEAD snapshot files:");
+                    foreach (var f in head.Snapshot.Files.Take(10)) // Limit to first 10
+                    {
+                        DebugLogger.Trace($"     - {f.FilePath} : {f.FileHash?.Substring(0, 8) ?? "null"}...");
+                    }
+                    if (head.Snapshot.Files.Count > 10)
+                    {
+                        DebugLogger.Trace($"     ... and {head.Snapshot.Files.Count - 10} more");
+                    }
+                }
+
+                await ChangeDetector.ScanForChangesAsync(_currentRootPath, head, _fileService);
+
+                var remainingChanges = ChangeDetector.GetChanges();
+                DebugLogger.Info($"  -> After rescan: {remainingChanges.Count} dirty files remain");
+                foreach (var kvp in remainingChanges.Take(10))
+                {
+                    DebugLogger.Trace($"     - {kvp.Key} : {kvp.Value}");
+                }
+                if (remainingChanges.Count > 10)
+                {
+                    DebugLogger.Trace($"     ... and {remainingChanges.Count - 10} more");
+                }
             }
 
             Status = $"Committed: {message}";
+            DebugLogger.Info($"  -> Commit complete");
         }
 
         // --- Remote Operations ---
 
         public async Task Push(string remoteName)
         {
-            var remote = RemoteService.GetRemote(remoteName);
+            var remote = await RemoteService.GetRemoteAsync(remoteName); 
             if (remote == null) throw new ArgumentException($"Remote '{remoteName}' not found.");
 
             var currentBranch = GraphService.GetCurrentBranch();
             if (currentBranch == null) throw new InvalidOperationException("No active branch to push.");
 
             Status = $"Pushing to {remoteName}...";
-            await _remoteController.Push(remote, currentBranch.BranchName);
+            await _remoteController.Push(remote, currentBranch.BranchName, _currentRootPath);
             Status = $"Pushed to {remoteName}";
         }
 
         public async Task Pull(string remoteName)
         {
-            var remote = RemoteService.GetRemote(remoteName);
+            var remote = await RemoteService.GetRemoteAsync(remoteName);
             if (remote == null) throw new ArgumentException($"Remote '{remoteName}' not found.");
 
             var currentBranch = GraphService.GetCurrentBranch();
             if (currentBranch == null) throw new InvalidOperationException("No active branch to pull into.");
 
             Status = $"Pulling from {remoteName}...";
-            await _remoteController.Pull(remote, currentBranch.BranchName);
+            await _remoteController.Pull(remote, currentBranch.BranchName, _currentRootPath);
             Status = $"Pulled from {remoteName}";
         }
     }

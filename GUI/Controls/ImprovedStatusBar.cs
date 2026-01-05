@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using Linage.Core.Configuration;
 using Linage.GUI.Configuration;
 using Linage.GUI.Services;
+using Linage.GUI.Theme;
 
 namespace Linage.GUI.Controls
 {
@@ -22,6 +23,21 @@ namespace Linage.GUI.Controls
         public ProgressBar ProgressBar { get; private set; }
 
         public ModernStatusBar StatusBar => _statusBar;
+
+        public void ApplyTheme()
+        {
+            _statusBar.BackColor = ModernTheme.StatusBarColor;
+            
+            // Labels are transparent, so they just pick up the back color.
+            // But we might want to update fonts or foreground colors if they changed.
+            
+            // Usually status bar text is white on the blue/colored background.
+            // If theme changes status bar color to light, we might need dark text.
+            // For now, assuming white text on status bar is standard for VS Code themes (or light grey).
+            
+            // Check contrast? 
+            // ModernTheme.StatusBarColor
+        }
 
         public ImprovedStatusBar(IDialogService dialogService, UILayoutConfiguration layoutConfig, EventHandler onBranchClick)
         {
@@ -162,9 +178,11 @@ namespace Linage.GUI.Controls
                 Padding = new Padding(Spacing.XSmall, Spacing.XXSmall + 2, Spacing.Medium, 0),
                 Cursor = Cursors.Hand
             };
-            bell.Click += (s, e) => _dialogService?.ShowInfo("Notifications", "No new notifications");
+            bell.Click += (s, e) => NotificationClicked?.Invoke(this, EventArgs.Empty);
             _statusBar.Controls.Add(bell);
         }
+
+        public event EventHandler NotificationClicked;
 
         private Label CreateSeparator()
         {

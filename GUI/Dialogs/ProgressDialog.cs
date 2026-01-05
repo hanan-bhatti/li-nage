@@ -273,9 +273,9 @@ namespace Linage.GUI.Dialogs
         /// </summary>
         private void InitializeComponent() {
             this.SuspendLayout();
-            //
+            // 
             // ProgressDialog
-            //
+            // 
             this.ClientSize = new System.Drawing.Size(282, 253);
             this.Name = "ProgressDialog";
             this.ResumeLayout(false);

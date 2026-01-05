@@ -50,5 +50,31 @@ namespace Linage.GUI.Helpers
             SendMessage(parent.Handle, WM_SETREDRAW, (IntPtr)1, (IntPtr)0);
             parent.Refresh();
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct SCROLLINFO
+        {
+            public uint cbSize;
+            public uint fMask;
+            public int nMin;
+            public int nMax;
+            public uint nPage;
+            public int nPos;
+            public int nTrackPos;
+        }
+
+        public const int SB_VERT = 1;
+        public const uint SIF_RANGE = 0x1;
+        public const uint SIF_PAGE = 0x2;
+        public const uint SIF_POS = 0x4;
+        public const uint SIF_ALL = SIF_RANGE | SIF_PAGE | SIF_POS;
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetScrollInfo(IntPtr hwnd, int fnBar, ref SCROLLINFO lpsi);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool ShowScrollBar(IntPtr hWnd, int wBar, [MarshalAs(UnmanagedType.Bool)] bool bShow);
     }
 }

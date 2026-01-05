@@ -1,64 +1,95 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using LibGit2Sharp;
 using Linage.Core;
 using Linage.Infrastructure;
+using LinageRemote = Linage.Core.Remote;
 
 namespace Linage.Controllers
 {
     public class RemoteController
     {
-        private readonly ITransport _httpTransport;
-        private readonly ITransport _sshTransport;
         private readonly AuthController _authController;
 
-        public RemoteController(ITransport httpTransport, ITransport sshTransport, AuthController authController)
+        public RemoteController(AuthController authController)
         {
-            _httpTransport = httpTransport;
-            _sshTransport = sshTransport;
-            _authController = authController;
+            _authController = authController ?? throw new ArgumentNullException(nameof(authController));
         }
 
-        public async Task Push(Remote remote, string branchName)
+        public async Task Push(LinageRemote remote, string branchName, string localRepoPath)
         {
-            if (await _authController.Authenticate(remote))
+            await Task.Run(() =>
             {
-                var transport = GetTransport(remote);
-                await transport.PushAsync(remote.RemoteUrl, branchName);
-            }
+                using (var repo = new Repository(localRepoPath))
+                {
+                    var gitRemote = repo.Network.Remotes[remote.RemoteName];
+                    if (gitRemote == null)
+                    {
+                        // Fallback: create or update remote if missing in .git config but present in our DB
+                        gitRemote = repo.Network.Remotes.Add(remote.RemoteName, remote.RemoteUrl);
+                    }
+
+                    var options = new PushOptions
+                    {
+                        CredentialsProvider = (url, user, types) => _authController.GetCredentials(url, user, types)
+                    };
+
+                    // Push specific branch
+                    // Note: RefSpec format "refs/heads/branch:refs/heads/branch"
+                    string pushRefSpec = $"refs/heads/{branchName}:refs/heads/{branchName}";
+                    repo.Network.Push(gitRemote, pushRefSpec, options);
+                }
+            });
         }
 
-        public async Task Pull(Remote remote, string branchName)
+        public async Task Pull(LinageRemote remote, string branchName, string localRepoPath)
         {
-            if (await _authController.Authenticate(remote))
+            await Task.Run(() =>
             {
-                var transport = GetTransport(remote);
-                await transport.PullAsync(remote.RemoteUrl, branchName);
-            }
+                using (var repo = new Repository(localRepoPath))
+                {
+                    // 1. Fetch
+                    var options = new FetchOptions
+                    {
+                        CredentialsProvider = (url, user, types) => _authController.GetCredentials(url, user, types)
+                    };
+                    
+                    var gitRemote = repo.Network.Remotes[remote.RemoteName];
+                    if (gitRemote == null)
+                         gitRemote = repo.Network.Remotes.Add(remote.RemoteName, remote.RemoteUrl);
+
+                    Commands.Fetch(repo, gitRemote.Name, new string[] { branchName }, options, null);
+
+                    // 2. Merge (Pull = Fetch + Merge)
+                    // We need to merge origin/branchName into local branchName
+                    var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
+                    var remoteBranchName = $"{remote.RemoteName}/{branchName}";
+                    
+                    // Merge remote tracking branch into current (assuming current is checked out)
+                    var result = repo.Merge(remoteBranchName, signature, new MergeOptions { FastForwardStrategy = FastForwardStrategy.Default });
+
+                    if (result.Status == MergeStatus.Conflicts)
+                    {
+                        throw new InvalidOperationException("Pull resulted in conflicts. Please resolve them manually.");
+                    }
+                }
+            });
         }
 
         public async Task<string> Clone(string remoteUrl, string destinationPath)
         {
              return await Task.Run(() => 
              {
-                 // Ensure we have credentials if needed (prompt or store)
-                 // For now, relying on AuthService to provide if cached/available 
-                 var options = new LibGit2Sharp.CloneOptions();
-                 options.FetchOptions.CredentialsProvider = (url, user, types) => _authController.GetCredentials(url, user, types);
+                 var options = new CloneOptions
+                 {
+                     FetchOptions = {
+                        CredentialsProvider = (url, user, types) => _authController.GetCredentials(url, user, types)
+                     }
+                 };
                  
-                 return LibGit2Sharp.Repository.Clone(remoteUrl, destinationPath, options);
+                 return Repository.Clone(remoteUrl, destinationPath, options);
              });
-        }
-
-        private ITransport GetTransport(Remote remote)
-        {
-            switch (remote.Protocol)
-            {
-                case RemoteProtocol.SSH:
-                    return _sshTransport;
-                case RemoteProtocol.HTTPS:
-                default:
-                    return _httpTransport;
-            }
         }
     }
 }

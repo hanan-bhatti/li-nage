@@ -26,6 +26,7 @@ namespace Linage.GUI
         private readonly IndexController _indexController;
         private readonly RemoteController _remoteController;
         private readonly AuthController _authController;
+        private Linage.GUI.Notifications.NotificationPresenter _notificationPresenter;
 
         // Services
         private readonly IDialogService _dialogService;
@@ -63,11 +64,15 @@ namespace Linage.GUI
         private GitGraphView _gitGraphView;
         private DebugView _debugView;
         private TerminalView _terminalView;
+        private WelcomeView _welcomeView;
 
         // State
         private string _currentRepository;
         private Dictionary<string, TabPage> _openFiles = new Dictionary<string, TabPage>();
         private Dictionary<string, TabPageData> _tabEventHandlers = new Dictionary<string, TabPageData>();
+        
+        // Empty State Placeholder
+        private Label _emptyStateLabel;
 
         // Helper class to store event handlers for cleanup
         private class TabPageData
@@ -93,9 +98,8 @@ namespace Linage.GUI
                 // Initialize Auth and Remote controllers using VersionController's services
                 _authController = new AuthController(_versionController.AuthService);
 
-                var httpTransport = new HttpTransport(_versionController.AuthService, ".");
-                var sshTransport = new SshTransport(_versionController.AuthService, ".");
-                _remoteController = new RemoteController(httpTransport, sshTransport, _authController);
+                // Initialize RemoteController with AuthController
+            _remoteController = new RemoteController(_authController);
 
                 // Initialize Services
                 _dialogService = new DialogService();
@@ -105,14 +109,44 @@ namespace Linage.GUI
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to initialize: {ex.Message}\n\nCheck SQL Server connection.",
+                // Unwrap InnerException if this is a TargetInvocationException
+                var realException = ex;
+                if (ex.InnerException != null)
+                {
+                    realException = ex.InnerException;
+                }
+
+                MessageBox.Show(
+                    $"Failed to initialize Li'nage:\n\n" +
+                    $"Error: {realException.Message}\n\n" +
+                    $"Troubleshooting:\n" +
+                    $"• Ensure SQL Server is running (LocalDB, Express, or full edition)\n" +
+                    $"• Verify the connection string in App.config\n" +
+                    $"• Check that the database can be accessed\n" +
+                    $"• Review logs in the 'logs' folder for more details\n\n" +
+                    $"Technical: {realException.GetType().Name}",
                     "Startup Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Environment.Exit(1);
                 _versionController = null;
             }
 
+            // Initialize theme manager first
+            var themeManager = ThemeManager.Instance;
+            themeManager.ThemeChanged += (s, e) => ApplyThemeToAll();
+
             InitializeComponent();
             SetupViews();
-            ApplyTheme();
+            ApplyThemeToAll();
+
+            // Initialize Notification Presenter
+            _notificationPresenter = new Linage.GUI.Notifications.NotificationPresenter(this);
+            if (_improvedStatusBar != null)
+            {
+                _improvedStatusBar.NotificationClicked += (s, e) => _notificationPresenter.ToggleCenter();
+            }
+
+            // Add Watermark
+            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "MainWindow.cs");
 
             // Removed: InitializeRefreshTimer() - Using FileWatcher events instead
 
@@ -128,13 +162,50 @@ namespace Linage.GUI
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainWindow));
             
             // Initialize Containers
-            _mainSplit = new SplitContainer { Dock = DockStyle.Fill, SplitterWidth = 1 };
-            _editorSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterWidth = 1 };
-            _sideBarContainer = new Panel { Dock = DockStyle.Fill };
+            _mainSplit = new SplitContainer 
+            { 
+                Dock = DockStyle.Fill, 
+                SplitterWidth = 1,
+                FixedPanel = FixedPanel.Panel1 // Fix Sidebar width
+            };
+            _editorSplit = new SplitContainer 
+            { 
+                Dock = DockStyle.Fill, 
+                Orientation = Orientation.Horizontal, 
+                SplitterWidth = 1,
+                FixedPanel = FixedPanel.Panel2 // Fix Terminal height
+            };
+            _sideBarContainer = new Panel 
+            { 
+                Dock = DockStyle.Fill,
+                BackColor = ModernTheme.SurfaceColor 
+            };
             
             // Initialize Tab Controls
-            _editorTabs = new ModernTabControl { Dock = DockStyle.Fill };
-            _terminalTabs = new ModernTabControl { Dock = DockStyle.Fill };
+            _editorTabs = new ModernTabControl 
+            { 
+                Dock = DockStyle.Fill,
+                BackColor = ModernTheme.BackColor,
+                ForeColor = ModernTheme.TextPrimary
+            };
+            _terminalTabs = new ModernTabControl 
+            { 
+                Dock = DockStyle.Fill,
+                BackColor = ModernTheme.SurfaceColor,
+                ForeColor = ModernTheme.TextPrimary
+            };
+            
+            // Empty State Label
+            _emptyStateLabel = new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = "No file is open", 
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI", 16, FontStyle.Regular),
+                ForeColor = ModernTheme.TextSecondary,
+                BackColor = ModernTheme.BackColor,
+                Visible = false
+            };
             
             CreateStatusBar(); // Calling this helper to init _statusBar
             CreateMenuStrip(); // Init _menuStrip
@@ -146,23 +217,43 @@ namespace Linage.GUI
             // Layout Setup
             // 
             
-            // Main Split - Use configuration values
-            _mainSplit.Panel1.Controls.Add(_sideBarContainer);
-            _mainSplit.Panel2.Controls.Add(_editorSplit);
-            _mainSplit.SplitterDistance = _layoutConfig?.SidebarWidth ?? Spacing.Layout.SidebarWidth;
-
-            // Editor Split - Use configuration values
-            _editorSplit.Panel1.Controls.Add(_editorTabs);
-            _editorSplit.Panel2.Controls.Add(_terminalTabs);
-            _editorSplit.SplitterDistance = _layoutConfig?.EditorPanelHeight ?? 600;
-
-            // Form - Use configuration values
+            // Set form size first
             this.ClientSize = new System.Drawing.Size(
                 _layoutConfig?.DefaultWindowWidth ?? 1200,
                 _layoutConfig?.DefaultWindowHeight ?? 800);
             this.MinimumSize = new System.Drawing.Size(
                 _layoutConfig?.MinimumWindowWidth ?? 800,
                 _layoutConfig?.MinimumWindowHeight ?? 600);
+            
+            // Main Split - Use configuration values
+            _mainSplit.Panel1.Controls.Add(_sideBarContainer);
+            _mainSplit.Panel2.Controls.Add(_editorSplit);
+            
+            // Set splitter distance after form is sized
+            int sidebarWidth = _layoutConfig?.SidebarWidth ?? Spacing.Layout.SidebarWidth;
+            _mainSplit.SplitterDistance = Math.Min(sidebarWidth, this.ClientSize.Width - 150);
+            
+            _mainSplit.BackColor = ModernTheme.SplitterColor;
+            _mainSplit.Panel1.BackColor = ModernTheme.SurfaceColor;
+            _mainSplit.Panel2.BackColor = ModernTheme.BackColor;
+
+            // Editor Split - Use configuration values
+            _editorSplit.Panel1.Controls.Add(_editorTabs);
+            _editorSplit.Panel1.Controls.Add(_emptyStateLabel); // Add empty state label
+            _editorSplit.Panel2.Controls.Add(_terminalTabs);
+            
+            // Set splitter distance after form is sized
+            int editorHeight = _layoutConfig?.EditorPanelHeight ?? 600;
+            _editorSplit.SplitterDistance = Math.Min(editorHeight, this.ClientSize.Height - 450);
+            
+            // Hide terminal panel on startup
+            _editorSplit.Panel2Collapsed = true;
+            
+            _editorSplit.BackColor = ModernTheme.SplitterColor;
+            _editorSplit.Panel1.BackColor = ModernTheme.BackColor;
+            _editorSplit.Panel2.BackColor = ModernTheme.SurfaceColor;
+
+            // Add controls to form
             this.Controls.Add(_mainSplit);     // Fill
             this.Controls.Add(_activityBar);   // Left
             this.Controls.Add(_statusBar);     // Bottom
@@ -175,6 +266,32 @@ namespace Linage.GUI
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Li\'nage - Advanced Version Control System";
             this.ResumeLayout(false);
+        }
+
+        private void UpdateEditorState()
+        {
+            // If welcome screen is visible, don't show empty state
+            bool isWelcomeVisible = _editorTabs.TabPages.Cast<TabPage>().Any(t => t.Name == "WelcomeTab");
+            if (isWelcomeVisible)
+            {
+                _editorTabs.Visible = true;
+                _emptyStateLabel.Visible = false;
+                return;
+            }
+
+            bool hasTabs = _editorTabs.TabPages.Count > 0;
+            
+            if (hasTabs)
+            {
+                _editorTabs.Visible = true;
+                _emptyStateLabel.Visible = false;
+            }
+            else
+            {
+                _editorTabs.Visible = false;
+                _emptyStateLabel.Visible = true;
+                _emptyStateLabel.BringToFront();
+            }
         }
 
         private void CreateActivityBar()
@@ -231,7 +348,13 @@ namespace Linage.GUI
 
         private void CreateMenuStrip()
         {
-            _menuStrip = new MenuStrip();
+            _menuStrip = new MenuStrip
+            {
+                BackColor = ModernTheme.SurfaceColor,
+                ForeColor = ModernTheme.TextPrimary,
+                Renderer = new VSCodeMenuRenderer(),
+                Padding = new Padding(5, 2, 0, 2)
+            };
 
             // File Menu
             var fileMenu = new ToolStripMenuItem("&File");
@@ -258,25 +381,47 @@ namespace Linage.GUI
             viewMenu.DropDownItems.Add("&Graph", null, (s, e) => SwitchSideBar("History")); 
             viewMenu.DropDownItems.Add("&Staging", null, (s, e) => SwitchSideBar("SourceControl"));
             viewMenu.DropDownItems.Add(new ToolStripSeparator());
-            viewMenu.DropDownItems.Add("Refresh &Status", null, (s, e) => {
-                _versionController?.ScanChanges();
+            viewMenu.DropDownItems.Add("&Themes...", null, (s, e) => new ThemeEditorDialog().ShowDialog(this));
+            viewMenu.DropDownItems.Add("Refresh &Status", null, async (s, e) => {
+                await _versionController?.ScanChangesAsync();
                 UpdateUI();
             });
 
             // Remote Menu
             var remoteMenu = new ToolStripMenuItem("&Remote");
+            remoteMenu.DropDownItems.Add("&Manage Remotes...", null, OnManageRemotes);
+            remoteMenu.DropDownItems.Add("-"); // Separator
             remoteMenu.DropDownItems.Add("&Push", null, OnPush);
             remoteMenu.DropDownItems.Add("P&ull", null, OnPull);
 
             // Help Menu
             var helpMenu = new ToolStripMenuItem("&Help");
             helpMenu.DropDownItems.Add("&About Li'nage", null, OnAbout);
+            helpMenu.DropDownItems.Add("Simulate &Notifications", null, (s, e) => {
+                var mgr = Linage.Infrastructure.Services.NotificationManager.Instance;
+                mgr.ShowSuccess("Build Succeeded", "Project compilation completed successfully.");
+                mgr.ShowWarning("Disk Space Low", "You are running low on disk space.");
+                mgr.ShowError("Connection Failed", "Connection timed out", new Exception("timeout"));
+                
+                var actions = new System.Collections.Generic.List<Linage.Core.Notifications.NotificationAction>
+                {
+                    new Linage.Core.Notifications.NotificationAction("Update", () => MessageBox.Show("Updated!"), true),
+                    new Linage.Core.Notifications.NotificationAction("Later", () => { })
+                };
+                mgr.Show("Update Available", "A new version of Li'nage is available.", Linage.Core.Notifications.NotificationSeverity.Info, actions);
+            });
 
             _menuStrip.Items.AddRange(new ToolStripItem[] { fileMenu, editMenu, viewMenu, remoteMenu, helpMenu });
         }
 
         private void SetupViews()
         {
+            // 0. Welcome View (show when no repository is open)
+            _welcomeView = new WelcomeView { Dock = DockStyle.Fill };
+            _welcomeView.OpenRepositoryClicked += OnOpenRepository;
+            _welcomeView.CloneRepositoryClicked += async (s, e) => await OnClone();
+            _welcomeView.ImportGitClicked += OnImportGitRepository;
+
             // 1. File Explorer
             _fileExplorer = new FileExplorerView { Dock = DockStyle.Fill };
             _fileExplorer.FileSelected += OnFileSelected;
@@ -296,6 +441,9 @@ namespace Linage.GUI
 
             _terminalTabs.TabPages.Add(new TabPage("Terminal") { Controls = { _terminalView } });
             _terminalTabs.TabPages.Add(new TabPage("Debug Console") { Controls = { _debugView } });
+            
+            // Show welcome view in editor area by default
+            ShowWelcomeScreen();
         }
 
         private void SwitchSideBar(string viewName)
@@ -356,24 +504,143 @@ namespace Linage.GUI
         }
 
 
-        private void ApplyTheme()
+        private void ApplyThemeToAll()
         {
+            // Main form
             this.BackColor = ModernTheme.BackColor;
             this.ForeColor = ModernTheme.TextPrimary;
 
-            // Menus
-            _menuStrip.BackColor = ModernTheme.BackColor; // Blend with Title Bar
-            _menuStrip.ForeColor = ModernTheme.TextPrimary;
-            _menuStrip.Renderer = new PremiumMenuRenderer();
+            // Menu
+            if (_menuStrip != null)
+            {
+                _menuStrip.BackColor = ModernTheme.SurfaceColor;
+                _menuStrip.ForeColor = ModernTheme.TextPrimary;
+                _menuStrip.Renderer = new VSCodeMenuRenderer();
+            }
 
-            // Splitters
-            _mainSplit.BackColor = ModernTheme.BorderColor;
-            _mainSplit.Panel1.BackColor = ModernTheme.SurfaceColor;
-            _mainSplit.Panel2.BackColor = ModernTheme.BackColor;
+            // Activity Bar
+            if (_activityBar != null)
+            {
+                _activityBar.BackColor = ModernTheme.ActivityBarColor;
+                foreach (Control c in _activityBar.Controls) c.Invalidate();
+            }
 
-            _editorSplit.BackColor = ModernTheme.BorderColor;
-            _editorSplit.Panel1.BackColor = ModernTheme.BackColor;
-            _editorSplit.Panel2.BackColor = ModernTheme.SurfaceColor;
+            // Sidebar Container
+            if (_sideBarContainer != null)
+            {
+                _sideBarContainer.BackColor = ModernTheme.SurfaceColor;
+                ApplyThemeToControls(_sideBarContainer.Controls);
+            }
+
+            // Main Split
+            if (_mainSplit != null)
+            {
+                _mainSplit.BackColor = ModernTheme.SplitterColor;
+                _mainSplit.Panel1.BackColor = ModernTheme.SurfaceColor;
+                _mainSplit.Panel2.BackColor = ModernTheme.BackColor;
+            }
+
+            // Editor Split
+            if (_editorSplit != null)
+            {
+                _editorSplit.BackColor = ModernTheme.SplitterColor;
+                _editorSplit.Panel1.BackColor = ModernTheme.BackColor;
+                _editorSplit.Panel2.BackColor = ModernTheme.SurfaceColor;
+            }
+
+            // Tab Controls
+            if (_editorTabs != null)
+            {
+                _editorTabs.BackColor = ModernTheme.BackColor;
+                _editorTabs.ForeColor = ModernTheme.TextPrimary;
+                _editorTabs.Invalidate(); // Redraw tabs
+                
+                // Refresh all open tabs in editor
+                foreach (TabPage tab in _editorTabs.TabPages)
+                {
+                    tab.BackColor = ModernTheme.BackColor;
+                    tab.ForeColor = ModernTheme.TextPrimary;
+                    ApplyThemeToControls(tab.Controls);
+                }
+            }
+            
+            // Empty State Label
+            if (_emptyStateLabel != null)
+            {
+                _emptyStateLabel.BackColor = ModernTheme.BackColor;
+                _emptyStateLabel.ForeColor = ModernTheme.TextSecondary;
+            }
+
+            if (_terminalTabs != null)
+            {
+                _terminalTabs.BackColor = ModernTheme.SurfaceColor;
+                _terminalTabs.ForeColor = ModernTheme.TextPrimary;
+                _terminalTabs.Invalidate(); 
+                
+                // Refresh all tabs in terminal
+                foreach (TabPage tab in _terminalTabs.TabPages)
+                {
+                    tab.BackColor = ModernTheme.SurfaceColor;
+                    tab.ForeColor = ModernTheme.TextPrimary;
+                    ApplyThemeToControls(tab.Controls);
+                }
+            }
+
+            // Status Bar
+            if (_improvedStatusBar != null)
+            {
+                _improvedStatusBar.ApplyTheme();
+            }
+
+            // Refresh the form
+            this.Refresh();
+        }
+
+        private void ApplyThemeToControls(Control.ControlCollection controls)
+        {
+            foreach (Control c in controls)
+            {
+                if (c is IThemable themable)
+                {
+                    themable.ApplyTheme();
+                }
+                
+                // Recursively check children if needed? 
+                // Usually IThemable controls handle their own children.
+                // But for panels that just hold IThemables...
+                if (c.HasChildren && !(c is IThemable)) // Don't go inside if it handles itself
+                {
+                    ApplyThemeToControls(c.Controls);
+                }
+            }
+        }
+
+        private void ShowWelcomeScreen()
+        {
+            // Clear editor tabs
+            if (_editorTabs.TabPages.Count == 0)
+            {
+                var welcomeTab = new TabPage("Welcome")
+                {
+                    BackColor = ModernTheme.BackColor,
+                    Name = "WelcomeTab"
+                };
+                welcomeTab.Controls.Add(_welcomeView);
+                _editorTabs.TabPages.Add(welcomeTab);
+                _editorTabs.SelectTab(welcomeTab);
+            }
+            UpdateEditorState();
+        }
+
+        private void HideWelcomeScreen()
+        {
+            // Remove welcome tab if it exists
+            var welcomeTab = _editorTabs.TabPages.Cast<TabPage>().FirstOrDefault(t => t.Name == "WelcomeTab");
+            if (welcomeTab != null)
+            {
+                _editorTabs.TabPages.Remove(welcomeTab);
+            }
+            UpdateEditorState();
         }
 
         // --- Event Handlers (Preserved Logic) ---
@@ -395,13 +662,12 @@ namespace Linage.GUI
                 ToggleProgress(true);
                 UpdateStatus("Loading repository...");
 
-                // Only run non-UI operations on background thread
+                // Hide welcome screen when loading a repository
+                HideWelcomeScreen();
+
                 if (_versionController != null)
                 {
-                    await Task.Run(() =>
-                    {
-                        _versionController.LoadProject(path);
-                    }).ConfigureAwait(true);
+                    await _versionController.LoadProjectAsync(path);
                 }
 
                 // UI operations must happen on UI thread
@@ -499,6 +765,8 @@ namespace Linage.GUI
             _editorTabs.TabPages.Add(tabPage);
             _openFiles.Add(filePath, tabPage);
             _editorTabs.SelectedTab = tabPage;
+            
+            UpdateEditorState();
         }
 
         private void CloseCurrentTab()
@@ -525,6 +793,8 @@ namespace Linage.GUI
 
             _editorTabs.TabPages.Remove(selectedTab);
             selectedTab.Dispose(); // Dispose the tab page
+            
+            UpdateEditorState();
         }
 
         private void CloseAllTabs()
@@ -538,6 +808,8 @@ namespace Linage.GUI
 
             _openFiles.Clear();
             _tabEventHandlers.Clear();
+            
+            UpdateEditorState();
         }
 
         private void SaveCurrentFile()
@@ -630,17 +902,45 @@ namespace Linage.GUI
 
         private async void OnCommitRequested(object sender, CommitEventArgs e)
         {
-            if (_versionController == null) return;
+            DebugLogger.Info("MainWindow.OnCommitRequested received");
+            DebugLogger.Trace($"  -> Message: {e.Message}");
+            DebugLogger.Trace($"  -> Files count: {e.SelectedFiles?.Count ?? 0}");
+
+            if (_versionController == null)
+            {
+                DebugLogger.Warn("  -> Aborting: _versionController is null");
+                return;
+            }
             try
             {
-                _versionController.CreateCommit(e.Message, e.SelectedFiles);
+                await _versionController.CreateCommitAsync(e.Message, e.SelectedFiles);
+                DebugLogger.Info("  -> Commit async completed");
+
                 _gitGraphView.SetCommits(_versionController.GraphService.GetCommitHistory());
+                DebugLogger.Trace("  -> Updated git graph");
+
+                // Check what ChangeDetector has after the commit
+                var changesAfterCommit = _versionController.ChangeDetector?.GetChanges();
+                DebugLogger.Info($"  -> ChangeDetector has {changesAfterCommit?.Count ?? 0} dirty files after commit");
+                if (changesAfterCommit != null)
+                {
+                    foreach (var kvp in changesAfterCommit.Take(10))
+                    {
+                        DebugLogger.Trace($"     - {kvp.Key} : {kvp.Value}");
+                    }
+                }
+
+                // Clear staging view by passing empty list
+                DebugLogger.Trace("  -> Clearing staging view with empty list");
                 _stagingView.SetFiles(new List<string>()); // Clear
+
                 UpdateStatus($"Committed: {e.Message}");
+                DebugLogger.Info("  -> Commit complete, showing success message");
                 MessageBox.Show("Commit Success");
             }
             catch (Exception ex)
             {
+                DebugLogger.Error($"  -> Commit failed: {ex.Message}");
                 MessageBox.Show($"Commit Failed: {ex.Message}");
                 ShowError("Commit Failed", ex);
             }
@@ -671,7 +971,7 @@ namespace Linage.GUI
             await _asyncHelper.ExecuteAsync(
                 async () =>
                 {
-                    var result = await _remoteOperationsService.PushAsync(remoteUrl);
+                    var result = await _remoteOperationsService.PushAsync(remoteUrl, _currentRepository);
                     if (result.IsSuccess)
                     {
                         _dialogService.ShowInfo("Push", result.Message);
@@ -696,7 +996,7 @@ namespace Linage.GUI
             await _asyncHelper.ExecuteAsync(
                 async () =>
                 {
-                    var result = await _remoteOperationsService.PullAsync(remoteUrl);
+                    var result = await _remoteOperationsService.PullAsync(remoteUrl, _currentRepository);
                     if (result.IsSuccess)
                     {
                         // Refresh graph and file status
@@ -715,12 +1015,379 @@ namespace Linage.GUI
                 null); // Don't show success message twice
         }
         
-        private void OnBranches(object sender, EventArgs e) 
+        private async void OnBranches(object sender, EventArgs e) 
         {
-             // Simple branch listing for now
-             var branches = _versionController.GraphService.GetAllBranches();
-             string branchList = string.Join("\n", branches.ConvertAll(b => b.BranchName));
-             MessageBox.Show($"Branches:\n{branchList}", "Branches");
+            if (_versionController?.GraphService == null) return;
+
+            var branches = await _versionController.GraphService.GetAllBranchesAsync();
+            if (branches == null || branches.Count == 0)
+            {
+                MessageBox.Show("No branches found. Create a new branch first.", "Branches", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var currentBranch = _versionController.GraphService.GetCurrentBranch();
+            
+            // Create a dialog for branch selection
+            using (var form = new Form
+            {
+                Text = "Switch Branch",
+                Width = 400,
+                Height = 350,
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false
+            })
+            {
+                var listBox = new ListBox
+                {
+                    Dock = DockStyle.Top,
+                    Height = 250,
+                    Items = { }
+                };
+
+                // Populate branches with current branch marked
+                foreach (var branch in branches)
+                {
+                    string displayName = branch.BranchName;
+                    if (currentBranch != null && currentBranch.BranchName == branch.BranchName)
+                        displayName += " (current)";
+                    listBox.Items.Add(branch.BranchName);
+                }
+
+                var btnSwitch = new Button
+                {
+                    Text = "Switch",
+                    DialogResult = DialogResult.OK,
+                    Dock = DockStyle.Bottom,
+                    Height = 40,
+                    Margin = new Padding(5)
+                };
+
+                var btnNewBranch = new Button
+                {
+                    Text = "New Branch",
+                    DialogResult = DialogResult.Retry,
+                    Dock = DockStyle.Bottom,
+                    Height = 40,
+                    Margin = new Padding(5)
+                };
+
+                var btnDelete = new Button
+                {
+                    Text = "Delete",
+                    DialogResult = DialogResult.Abort,
+                    Dock = DockStyle.Bottom,
+                    Height = 40,
+                    Margin = new Padding(5)
+                };
+
+                form.Controls.Add(btnSwitch);
+                form.Controls.Add(btnNewBranch);
+                form.Controls.Add(btnDelete);
+                form.Controls.Add(listBox);
+
+                var result = form.ShowDialog(this);
+
+                if (result == DialogResult.OK && listBox.SelectedIndex >= 0)
+                {
+                    string selectedBranch = listBox.SelectedItem.ToString();
+                    await SwitchBranchAsync(selectedBranch);
+                }
+                else if (result == DialogResult.Retry)
+                {
+                    await CreateNewBranchAsync();
+                }
+                else if (result == DialogResult.Abort && listBox.SelectedIndex >= 0)
+                {
+                    string branchToDelete = listBox.SelectedItem.ToString();
+                    if (currentBranch?.BranchName == branchToDelete)
+                    {
+                        MessageBox.Show("Cannot delete the current branch. Switch to another branch first.", 
+                            "Delete Branch", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    if (MessageBox.Show($"Delete branch '{branchToDelete}'?", "Confirm Delete", 
+                        MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                    {
+                        await DeleteBranchAsync(branchToDelete);
+                    }
+                }
+            }
+        }
+
+        private async Task SwitchBranchAsync(string branchName)
+        {
+            try
+            {
+                ToggleProgress(true);
+                UpdateStatus($"Switching to branch '{branchName}'...");
+
+                await _versionController.GraphService.SwitchBranchAsync(branchName);
+
+                // Refresh UI
+                _lblBranch.Text = branchName;
+                _gitGraphView.SetCommits(_versionController.GraphService.GetCommitHistory());
+                _stagingView.SetFiles(_versionController.ChangeDetector?.GetChangedFiles());
+
+                UpdateStatus($"Switched to branch '{branchName}'");
+                _debugView?.Log($"Switched to branch: {branchName}");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to switch branch: {ex.Message}", "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _debugView?.Log($"Switch branch error: {ex.Message}");
+            }
+            finally
+            {
+                ToggleProgress(false);
+            }
+        }
+
+        private async Task CreateNewBranchAsync()
+        {
+            string branchName = _dialogService.PromptForInput("Create Branch", "Enter new branch name:");
+            if (string.IsNullOrEmpty(branchName)) return;
+
+            try
+            {
+                ToggleProgress(true);
+                UpdateStatus($"Creating branch '{branchName}'...");
+
+                await _versionController.GraphService.CreateBranchAsync(branchName);
+                await _versionController.GraphService.SwitchBranchAsync(branchName);
+
+                // Refresh UI
+                _lblBranch.Text = branchName;
+                _gitGraphView.SetCommits(_versionController.GraphService.GetCommitHistory());
+
+                UpdateStatus($"Created and switched to branch '{branchName}'");
+                _debugView?.Log($"Created new branch: {branchName}");
+                MessageBox.Show($"Created and switched to branch '{branchName}'", "Success", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to create branch: {ex.Message}", "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _debugView?.Log($"Create branch error: {ex.Message}");
+            }
+            finally
+            {
+                ToggleProgress(false);
+            }
+        }
+
+        private async Task DeleteBranchAsync(string branchName)
+        {
+            try
+            {
+                ToggleProgress(true);
+                UpdateStatus($"Deleting branch '{branchName}'...");
+
+                await _versionController.GraphService.DeleteBranchAsync(branchName);
+
+                UpdateStatus($"Deleted branch '{branchName}'");
+                _debugView?.Log($"Deleted branch: {branchName}");
+                MessageBox.Show($"Deleted branch '{branchName}'", "Success", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                
+                // Refresh branches dialog
+                OnBranches(null, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to delete branch: {ex.Message}", "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _debugView?.Log($"Delete branch error: {ex.Message}");
+            }
+            finally
+            {
+                ToggleProgress(false);
+            }
+        }
+        
+        
+        private async void OnManageRemotes(object sender, EventArgs e)
+        {
+            if (_versionController?.RemoteService == null) return;
+
+            var remotes = await _versionController.RemoteService.GetAllRemotesAsync();
+
+            // Create a dialog for managing remotes
+            using (var form = new Form
+            {
+                Text = "Manage Remotes",
+                Width = 500,
+                Height = 400,
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false
+            })
+            {
+                var listBox = new ListBox
+                {
+                    Dock = DockStyle.Top,
+                    Height = 250,
+                    Items = { }
+                };
+
+                // Populate remotes
+                foreach (var remote in remotes)
+                {
+                    string displayName = $"{remote.RemoteName}: {remote.RemoteUrl}";
+                    if (remote.IsDefault)
+                        displayName += " (default)";
+                    listBox.Items.Add(remote.RemoteName);
+                }
+
+                var btnAdd = new Button
+                {
+                    Text = "Add Remote",
+                    DialogResult = DialogResult.OK,
+                    Dock = DockStyle.Bottom,
+                    Height = 40,
+                    Margin = new Padding(5)
+                };
+
+                var btnSetDefault = new Button
+                {
+                    Text = "Set as Default",
+                    DialogResult = DialogResult.Retry,
+                    Dock = DockStyle.Bottom,
+                    Height = 40,
+                    Margin = new Padding(5)
+                };
+
+                var btnRemove = new Button
+                {
+                    Text = "Remove",
+                    DialogResult = DialogResult.Abort,
+                    Dock = DockStyle.Bottom,
+                    Height = 40,
+                    Margin = new Padding(5)
+                };
+
+                form.Controls.Add(btnAdd);
+                form.Controls.Add(btnSetDefault);
+                form.Controls.Add(btnRemove);
+                form.Controls.Add(listBox);
+
+                var result = form.ShowDialog(this);
+
+                if (result == DialogResult.OK)
+                {
+                    await AddRemoteAsync();
+                }
+                else if (result == DialogResult.Retry && listBox.SelectedIndex >= 0)
+                {
+                    string remoteName = listBox.SelectedItem.ToString();
+                    await SetDefaultRemoteAsync(remoteName);
+                }
+                else if (result == DialogResult.Abort && listBox.SelectedIndex >= 0)
+                {
+                    string remoteName = listBox.SelectedItem.ToString();
+                    if (MessageBox.Show($"Remove remote '{remoteName}'?", "Confirm Remove", 
+                        MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                    {
+                        await RemoveRemoteAsync(remoteName);
+                    }
+                }
+            }
+        }
+
+        private async Task AddRemoteAsync()
+        {
+            string remoteName = _dialogService.PromptForInput("Add Remote", "Enter remote name (e.g., 'origin'):");
+            if (string.IsNullOrEmpty(remoteName)) return;
+
+            string remoteUrl = _dialogService.PromptForInput("Add Remote", "Enter remote URL (e.g., 'https://...'):");
+            if (string.IsNullOrEmpty(remoteUrl)) return;
+
+            try
+            {
+                ToggleProgress(true);
+                UpdateStatus($"Adding remote '{remoteName}'...");
+
+                await _versionController.RemoteService.AddRemoteAsync(remoteName, remoteUrl);
+
+                UpdateStatus($"Added remote '{remoteName}'");
+                _debugView?.Log($"Added remote: {remoteName} -> {remoteUrl}");
+                MessageBox.Show($"Added remote '{remoteName}'", "Success", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to add remote: {ex.Message}", "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _debugView?.Log($"Add remote error: {ex.Message}");
+            }
+            finally
+            {
+                ToggleProgress(false);
+            }
+        }
+
+        private async Task RemoveRemoteAsync(string remoteName)
+        {
+            try
+            {
+                ToggleProgress(true);
+                UpdateStatus($"Removing remote '{remoteName}'...");
+
+                await _versionController.RemoteService.RemoveRemoteAsync(remoteName);
+
+                UpdateStatus($"Removed remote '{remoteName}'");
+                _debugView?.Log($"Removed remote: {remoteName}");
+                MessageBox.Show($"Removed remote '{remoteName}'", "Success", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                
+                // Refresh remotes dialog
+                OnManageRemotes(null, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to remove remote: {ex.Message}", "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _debugView?.Log($"Remove remote error: {ex.Message}");
+            }
+            finally
+            {
+                ToggleProgress(false);
+            }
+        }
+
+        private async Task SetDefaultRemoteAsync(string remoteName)
+        {
+            try
+            {
+                ToggleProgress(true);
+                UpdateStatus($"Setting '{remoteName}' as default remote...");
+
+                await _versionController.RemoteService.SetDefaultRemoteAsync(remoteName);
+
+                UpdateStatus($"'{remoteName}' is now the default remote");
+                _debugView?.Log($"Set default remote: {remoteName}");
+                MessageBox.Show($"'{remoteName}' is now the default remote", "Success", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                
+                // Refresh remotes dialog
+                OnManageRemotes(null, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to set default remote: {ex.Message}", "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _debugView?.Log($"Set default remote error: {ex.Message}");
+            }
+            finally
+            {
+                ToggleProgress(false);
+            }
         }
         
         
@@ -814,12 +1481,12 @@ namespace Linage.GUI
 
                 if (isQuick)
                 {
-                    result = await Task.Run(() => importer.QuickImport(gitPath));
+                    result = await importer.QuickImportAsync(gitPath);
                 }
                 else
                 {
                     // Full import with progress reporting
-                    result = await Task.Run(() => importer.ImportRepository(gitPath, progress));
+                    result = await importer.ImportRepositoryAsync(gitPath, progress);
                 }
 
                 if (result.Success)
@@ -828,7 +1495,7 @@ namespace Linage.GUI
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     
                     // Load the imported project
-                    _versionController.LoadProject(gitPath);
+                    await _versionController.LoadProjectAsync(gitPath);
                     _fileExplorer.LoadRepository(gitPath);
                     _gitGraphView.SetCommits(_versionController.GraphService.GetCommitHistory());
                 }

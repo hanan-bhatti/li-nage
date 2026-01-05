@@ -1,10 +1,11 @@
 using System.Collections.Generic;
 using System.Windows.Forms;
 using Linage.Core;
+using Linage.GUI.Theme;
 
 namespace Linage.GUI
 {
-    public class AIHistoryView : UserControl
+    public class AIHistoryView : UserControl, IThemable
     {
         public string Id { get; set; } = string.Empty;
         public string State { get; set; } = "Visible";
@@ -14,6 +15,13 @@ namespace Linage.GUI
         public AIHistoryView()
         {
             this.BackColor = System.Drawing.Color.AliceBlue;
+            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "AIHistoryView.cs");
+        }
+
+        public void ApplyTheme()
+        {
+            this.BackColor = ModernTheme.BackColor;
+            this.ForeColor = ModernTheme.TextPrimary;
         }
     }
 }

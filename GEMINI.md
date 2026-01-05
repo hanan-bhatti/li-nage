@@ -6,18 +6,18 @@ Li'nage is an advanced version control system designed to provide granular line-
 ## Current State
 - **Phase 1 (Foundation):** Completed. Data models (Commit, Snapshot, FileMetadata, etc.) and basic database context are set up.
 - **Phase 2 (Core Features):** Completed (believed). Diff algorithms (Myers, Patient, Minimal), LineTracker, and ChangeDetector are implemented.
-- **Phase 3 (Authentication & Remote):** In Progress. Skeleton classes exist for Credentials and Transports but contain boilerplate/stub logic.
+- **Phase 3 (Authentication & Remote):** Completed. `Push` and `Pull` implemented via `LibGit2Sharp`. Transport layers consolidated.
 
 ## Environment
 - **Platform:** Linux (Development), Windows Forms (UI Target).
 - **Framework:** .NET 8.0 (Windows target in csproj).
-- **Database:** SQLite (Current), SQL Server (Requested).
+- **Database:** SQL Server (Current), SQLite (Legacy).
 
 ## Roadmap
 - **Immediate Goal:**
-    1.  Integrate SQL Server support.
-    2.  Implement Phase 3 (Authentication, SSH/OAuth, Remote Integration).
-    3.  Verify and refine Phase 2 changes if necessary.
+    1.  **Verification**: Test Push/Pull with real GitHub repo.
+    2.  **Refinement**: Improve error handling for merge conflicts.
+    3.  **Docs**: Generate user manual.
 
 ## Key Architecture
 - **Presentation:** Windows Forms (GUI).

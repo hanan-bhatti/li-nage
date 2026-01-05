@@ -25,10 +25,10 @@ namespace Linage.Controllers
                     try
                     {
                         // Pull first (Fetch + Merge)
-                        await _remoteController.Pull(remote, project.DefaultBranch ?? "main");
+                        await _remoteController.Pull(remote, project.DefaultBranch ?? "main", project.RepositoryPath);
                         
                         // Then Push
-                        await _remoteController.Push(remote, project.DefaultBranch ?? "main");
+                        await _remoteController.Push(remote, project.DefaultBranch ?? "main", project.RepositoryPath);
                     }
                     catch (Exception ex)
                     {

@@ -11,11 +11,50 @@ namespace Linage.GUI
     /// <summary>
     /// File Explorer view showing repository files in a tree structure
     /// </summary>
-    public class FileExplorerView : UserControl
+    public class FileExplorerView : UserControl, IThemable
     {
-        private ModernTreeView _treeView;
+        private TreeView _treeView;
+
+        public void ApplyTheme()
+        {
+            this.BackColor = ModernTheme.SurfaceColor;
+            
+            // Header
+            if (this.Controls.Count > 0 && this.Controls[1] is Panel header)
+            {
+                header.BackColor = ModernTheme.SurfaceColor;
+            }
+
+            // TreeView
+            if (_treeView != null)
+            {
+                _treeView.BackColor = ModernTheme.SurfaceColor;
+                _treeView.ForeColor = ModernTheme.TextPrimary;
+                _treeView.LineColor = ModernTheme.BorderColor;
+            }
+            
+            // SearchBox
+            if (_searchBox != null)
+            {
+                _searchBox.BackColor = ModernTheme.SurfaceColor;
+                if (_searchBox.InnerTextBox != null)
+                {
+                    _searchBox.InnerTextBox.BackColor = ModernTheme.SurfaceColor;
+                    _searchBox.InnerTextBox.ForeColor = ModernTheme.TextPrimary;
+                }
+            }
+            
+            // Context Menu
+            if (_contextMenu != null)
+            {
+                // Renderer updates automatically as it uses static ModernTheme
+                // But we might need to force refresh
+                _contextMenu.Renderer = new ToolStripProfessionalRenderer(new ModernMenuRenderer());
+            }
+        }
+
         private MaterialTextBox _searchBox;
-        private Label _lblPath;
+        // private Label _lblPath; // Removed unused field
         private string _rootPath;
         private ContextMenuStrip _contextMenu;
 
@@ -28,6 +67,7 @@ namespace Linage.GUI
         {
             InitializeComponent();
             SetupContextMenu();
+            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "FileExplorerView.cs");
         }
 
         private void SetupContextMenu()

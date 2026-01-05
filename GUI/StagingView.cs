@@ -1,15 +1,61 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using Linage.Controllers;
 using Linage.GUI.Theme;
 using Linage.GUI.Controls;
+using Linage.Infrastructure;
 
 namespace Linage.GUI
 {
-    public class StagingView : UserControl
+    public class StagingView : UserControl, IThemable
     {
+        // ...
+
+        public void ApplyTheme()
+        {
+            this.BackColor = ModernTheme.BackColor;
+
+            if (_lblFiles != null)
+            {
+                _lblFiles.ForeColor = ModernTheme.TextPrimary;
+                _lblFiles.Font = ModernTheme.FontH2;
+            }
+
+            if (_lblMessage != null)
+            {
+                _lblMessage.ForeColor = ModernTheme.TextPrimary;
+                _lblMessage.Font = ModernTheme.FontH2;
+            }
+
+            if (_filesList != null)
+            {
+                _filesList.BackColor = ModernTheme.SurfaceColor;
+                _filesList.ForeColor = ModernTheme.TextPrimary;
+                _filesList.Font = ModernTheme.FontBody;
+            }
+
+            if (_commitMessage != null)
+            {
+                _commitMessage.BackColor = ModernTheme.SurfaceColor;
+                if (_commitMessage.InnerTextBox != null)
+                {
+                    _commitMessage.InnerTextBox.BackColor = ModernTheme.SurfaceColor;
+                    _commitMessage.InnerTextBox.ForeColor = ModernTheme.TextPrimary;
+                    _commitMessage.InnerTextBox.Font = ModernTheme.FontBody;
+                }
+            }
+
+            if (_commitButton != null)
+            {
+                _commitButton.BackColor = ModernTheme.PrimaryColor;
+                _commitButton.ForeColor = Color.White;
+                _commitButton.Font = ModernTheme.FontBody;
+            }
+        }
+
         private CheckedListBox _filesList;
         private MaterialTextBox _commitMessage;
         private MaterialButton _commitButton;
@@ -21,6 +67,7 @@ namespace Linage.GUI
         public StagingView()
         {
             InitializeComponent();
+            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "StagingView.cs");
         }
 
         private void InitializeComponent()
@@ -94,22 +141,37 @@ namespace Linage.GUI
 
         public void SetFiles(IEnumerable<string> files)
         {
+            DebugLogger.Trace($"StagingView.SetFiles called");
+
             if (files == null)
             {
+                DebugLogger.Trace("  -> files is null, clearing list");
                 _filesList.Items.Clear();
                 return;
             }
 
-            var newFiles = new HashSet<string>(files);
+            var fileList = files.ToList();
+            DebugLogger.Trace($"  -> Received {fileList.Count} files");
+            foreach (var f in fileList)
+            {
+                DebugLogger.Trace($"     - {f}");
+            }
+
+            var newFiles = new HashSet<string>(fileList);
             var currentFiles = new HashSet<string>();
             foreach(var item in _filesList.Items) currentFiles.Add(item.ToString());
 
             // Check if lists are identical
-            if (newFiles.SetEquals(currentFiles)) return; // No change, prevent flicker
+            if (newFiles.SetEquals(currentFiles))
+            {
+                DebugLogger.Trace("  -> No change from current list, skipping update");
+                return; // No change, prevent flicker
+            }
 
+            DebugLogger.Info($"StagingView updating with {fileList.Count} changed files");
             _filesList.BeginUpdate();
             _filesList.Items.Clear();
-            foreach (var f in files)
+            foreach (var f in fileList)
             {
                 _filesList.Items.Add(f, true); // Default to checked
             }
@@ -118,8 +180,11 @@ namespace Linage.GUI
 
         private void TriggerCommit()
         {
+            DebugLogger.Info("StagingView.TriggerCommit called");
+
             if (string.IsNullOrWhiteSpace(_commitMessage.Text))
             {
+                DebugLogger.Warn("  -> Commit aborted: empty message");
                 MessageBox.Show("Please enter a commit message.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -130,12 +195,19 @@ namespace Linage.GUI
                 selectedFiles.Add(item.ToString());
             }
 
-            OnCommitRequested?.Invoke(this, new CommitEventArgs 
-            { 
-                Message = _commitMessage.Text, 
-                SelectedFiles = selectedFiles 
+            DebugLogger.Info($"  -> Committing {selectedFiles.Count} files with message: {_commitMessage.Text}");
+            foreach (var f in selectedFiles)
+            {
+                DebugLogger.Trace($"     - {f}");
+            }
+
+            OnCommitRequested?.Invoke(this, new CommitEventArgs
+            {
+                Message = _commitMessage.Text,
+                SelectedFiles = selectedFiles
             });
-            
+
+            DebugLogger.Trace("  -> Clearing commit message textbox");
             _commitMessage.Text = "";
         }
     }

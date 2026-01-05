@@ -15,6 +15,13 @@ namespace Linage.Core
         public DateTime ModifiedDate { get; set; }
         public bool IsDeleted { get; set; }
 
+        /// <summary>
+        /// Parameterless constructor required by Entity Framework for database deserialization
+        /// </summary>
+        public FileMetadata()
+        {
+        }
+
         public FileMetadata(string filePath, string fileHash, long fileSize, DateTime modifiedDate, bool isDeleted = false)
         {
             FilePath = filePath;

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Linage.Infrastructure;
 
 namespace Linage.Core
@@ -24,7 +25,6 @@ namespace Linage.Core
         public VersionGraphService(MetadataStore metadataStore)
         {
             _metadataStore = metadataStore ?? throw new ArgumentNullException(nameof(metadataStore));
-            LoadGraph();
         }
 
         public void SetFileService(FileService fileService)
@@ -32,20 +32,18 @@ namespace Linage.Core
             _fileService = fileService;
         }
 
-        private void LoadGraph()
+        public async Task InitializeAsync()
         {
             // Hydrate cache from store
-            var commits = _metadataStore.GetAllCommits();
+            var commits = await _metadataStore.GetAllCommitsAsync();
             foreach (var c in commits)
             {
                 if (!_commitCache.ContainsKey(c.CommitId))
                     _commitCache[c.CommitId] = c;
             }
-            // For now, branches are loaded on demand or we could load all
-            // Ideally we'd have _metadataStore.GetAllBranches()
         }
 
-        public void AddCommit(Commit commit)
+        public async Task AddCommitAsync(Commit commit)
         {
             if (commit == null) throw new ArgumentNullException(nameof(commit));
             
@@ -63,20 +61,25 @@ namespace Linage.Core
             if (_currentBranch != null)
             {
                 _currentBranch.MoveHead(commit);
-                _metadataStore.SaveBranch(_currentBranch);
+                await _metadataStore.SaveBranchAsync(_currentBranch);
             }
 
             // Invalidate history cache
             _cachedHistoryList = null;
 
             // Persist
-            _metadataStore.SaveCommit(commit);
+            await _metadataStore.SaveCommitAsync(commit);
         }
 
-        public Branch CreateBranch(string name)
+        public async Task<Branch> CreateBranchAsync(string name)
         {
             if (string.IsNullOrEmpty(name)) throw new ArgumentException("Branch name cannot be empty.");
-            if (_branchCache.ContainsKey(name) || _metadataStore.GetBranch(name) != null)
+            
+            if (_branchCache.ContainsKey(name))
+                 throw new InvalidOperationException($"Branch '{name}' already exists.");
+
+            var existing = await _metadataStore.GetBranchAsync(name);
+            if (existing != null)
                 throw new InvalidOperationException($"Branch '{name}' already exists.");
 
             if (_currentBranch == null && _commitCache.Count > 0)
@@ -90,11 +93,11 @@ namespace Linage.Core
             };
 
             _branchCache[name] = newBranch;
-            _metadataStore.SaveBranch(newBranch);
+            await _metadataStore.SaveBranchAsync(newBranch);
             return newBranch;
         }
 
-        public Branch GetBranch(string name)
+        public async Task<Branch> GetBranchAsync(string name)
         {
             if (string.IsNullOrEmpty(name))
                 return null;
@@ -102,7 +105,7 @@ namespace Linage.Core
             if (_branchCache.TryGetValue(name, out var cached))
                 return cached;
             
-            var branch = _metadataStore.GetBranch(name);
+            var branch = await _metadataStore.GetBranchAsync(name);
             if (branch != null)
                 _branchCache[name] = branch;
             
@@ -114,19 +117,18 @@ namespace Linage.Core
             return _currentBranch;
         }
 
-        public List<Branch> GetAllBranches()
+        public async Task<List<Branch>> GetAllBranchesAsync()
         {
-            return _metadataStore.GetAllBranches();
+            return await _metadataStore.GetAllBranchesAsync();
         }
 
-        public void SwitchBranch(string name)
+        public async Task SwitchBranchAsync(string name)
         {
-            var branch = _metadataStore.GetBranch(name);
+            var branch = await GetBranchAsync(name);
             if (branch == null) throw new ArgumentException($"Branch '{name}' not found.");
 
             _currentBranch = branch;
             _cachedHistoryList = null; // Invalidate cache
-            // In a real app, this would also trigger working directory updates (checkout)
         }
 
         public List<Commit> GetCommitHistory()
@@ -172,22 +174,18 @@ namespace Linage.Core
             return null;
         }
 
-        // Real merge implementation with blob storage
         public List<Conflict> Merge(Branch source)
         {
             if (source == null) throw new ArgumentNullException(nameof(source));
             if (_currentBranch == null) throw new InvalidOperationException("No active branch checked out.");
 
-            // 1. Find common ancestor
             var ancestor = FindCommonAncestor(_currentBranch.HeadCommit, source.HeadCommit);
             if (ancestor == null)
                 throw new InvalidOperationException("Branches have no common ancestor.");
 
-            // 2. Prepare Merge Service
             var mergeService = new MergeService();
             var conflicts = new List<Conflict>();
 
-            // 3. Get snapshots
             var snapshotBase = ancestor?.Snapshot;
             var snapshotLocal = _currentBranch.HeadCommit?.Snapshot;
             var snapshotRemote = source.HeadCommit?.Snapshot;
@@ -197,14 +195,12 @@ namespace Linage.Core
             if (snapshotLocal != null) foreach(var f in snapshotLocal.Files) allFiles.Add(f.FilePath);
             if (snapshotRemote != null) foreach(var f in snapshotRemote.Files) allFiles.Add(f.FilePath);
 
-            // 4. Retrieve content from blob storage
             foreach (var path in allFiles)
             {
                 string baseContent = string.Empty;
                 string localContent = string.Empty;
                 string remoteContent = string.Empty;
 
-                // Get base content
                 if (snapshotBase != null && _fileService != null)
                 {
                     var baseFile = snapshotBase.Files.Find(f => f.FilePath == path);
@@ -215,7 +211,6 @@ namespace Linage.Core
                     }
                 }
 
-                // Get local content (from working directory or blob)
                 if (snapshotLocal != null)
                 {
                     var localFile = snapshotLocal.Files.Find(f => f.FilePath == path);
@@ -232,7 +227,6 @@ namespace Linage.Core
                     }
                 }
 
-                // Get remote content
                 if (snapshotRemote != null && _fileService != null)
                 {
                     var remoteFile = snapshotRemote.Files.Find(f => f.FilePath == path);
@@ -245,15 +239,13 @@ namespace Linage.Core
                 
                 var result = mergeService.MergeFile(path, baseContent, localContent, remoteContent);
                 if (!result.Success)
-                {
                     conflicts.AddRange(result.Conflicts);
-                }
             }
             
             return conflicts; 
         }
 
-        public void Rebase(Commit onto)
+        public async Task RebaseAsync(Commit onto)
         {
             if (onto == null) throw new ArgumentNullException(nameof(onto));
             if (_currentBranch == null) throw new InvalidOperationException("No active branch checked out.");
@@ -261,12 +253,10 @@ namespace Linage.Core
             var currentHead = _currentBranch.HeadCommit;
             if (currentHead == null) throw new InvalidOperationException("Current branch has no commits.");
             
-            // Find the common ancestor (merge base)
             var mergeBase = FindCommonAncestor(currentHead, onto);
             if (mergeBase == null)
                 throw new InvalidOperationException("No common ancestor found. Cannot rebase unrelated histories.");
             
-            // Get list of commits to replay (from mergeBase to currentHead)
             var commitsToReplay = new List<Commit>();
             var current = currentHead;
             var visited = new HashSet<Guid>();
@@ -274,38 +264,29 @@ namespace Linage.Core
             while (current != null && current.CommitId != mergeBase.CommitId)
             {
                 if (!visited.Add(current.CommitId))
-                    break; // Cycle detection
+                    break;
                     
                 commitsToReplay.Add(current);
-                
-                // Follow first parent for linear history during rebase
                 current = current.Parents?.FirstOrDefault();
             }
             
-            // Reverse to get chronological order (oldest first)
             commitsToReplay.Reverse();
             
-            // Start rebase: Set HEAD to 'onto'
             var rebasedParent = onto;
-            var lineTracker = new LineTracker();
-            var fileService = new FileService(new HashService());
             
-            // Replay each commit on top of 'onto'
             foreach (var originalCommit in commitsToReplay)
             {
-                // Create a new commit with same message but different parent
                 var rebasedCommit = new Commit
                 {
                     CommitId = Guid.NewGuid(),
                     Message = originalCommit.Message,
                     AuthorName = originalCommit.AuthorName,
                     AuthorEmail = originalCommit.AuthorEmail,
-                    Timestamp = DateTime.Now, // New timestamp for rebased commit
+                    Timestamp = DateTime.Now,
                     AiAssisted = originalCommit.AiAssisted,
                     Parents = new List<Commit> { rebasedParent }
                 };
                 
-                // Clone snapshot (simplified - in production would apply diff patches)
                 rebasedCommit.Snapshot = new Snapshot
                 {
                     SnapshotId = Guid.NewGuid(),
@@ -313,26 +294,19 @@ namespace Linage.Core
                     Files = new List<FileMetadata>(originalCommit.Snapshot?.Files ?? new List<FileMetadata>())
                 };
                 
-                // Calculate hash
                 rebasedCommit.CommitHash = rebasedCommit.CalculateHash();
                 
-                // Add to graph
-                AddCommit(rebasedCommit);
+                await AddCommitAsync(rebasedCommit);
                 
-                // Move forward
                 rebasedParent = rebasedCommit;
             }
             
-            // Update current branch to point to the last rebased commit
             _currentBranch.MoveHead(rebasedParent);
-            _metadataStore.SaveBranch(_currentBranch);
-            _cachedHistoryList = null; // Invalidate cache
+            await _metadataStore.SaveBranchAsync(_currentBranch);
+            _cachedHistoryList = null; 
         }
         
-        /// <summary>
-        /// Delete a branch (cannot delete active branch)
-        /// </summary>
-        public void DeleteBranch(string branchName)
+        public async Task DeleteBranchAsync(string branchName)
         {
             if (string.IsNullOrEmpty(branchName))
                 throw new ArgumentException("Branch name cannot be empty.");
@@ -340,7 +314,7 @@ namespace Linage.Core
             if (_currentBranch != null && _currentBranch.BranchName == branchName)
                 throw new InvalidOperationException("Cannot delete the currently active branch.");
                 
-            _metadataStore.DeleteBranch(branchName);
+            await _metadataStore.DeleteBranchAsync(branchName);
             _branchCache.Remove(branchName);
         }
     }

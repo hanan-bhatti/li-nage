@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Linage.Core;
 using Linage.Infrastructure;
 
@@ -21,7 +22,7 @@ namespace Linage.Controllers
         /// <summary>
         /// Scan a directory for files and create metadata
         /// </summary>
-        public List<FileMetadata> ScanDirectory(string directoryPath, string rootPath)
+        public async Task<List<FileMetadata>> ScanDirectoryAsync(string directoryPath, string rootPath)
         {
             if (string.IsNullOrEmpty(directoryPath))
                 throw new ArgumentNullException(nameof(directoryPath));
@@ -32,7 +33,7 @@ namespace Linage.Controllers
             try
             {
                 Scanner.RootPath = rootPath;
-                var files = _fileService.ScanDirectory(directoryPath, rootPath);
+                var files = await _fileService.ScanDirectoryAsync(directoryPath, rootPath);
                 Status = $"Scanned {files.Count} files";
                 return files;
             }
