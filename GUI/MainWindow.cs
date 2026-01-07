@@ -133,9 +133,7 @@ namespace Linage.GUI
                 // These lines seem to belong to a project loading method, not the constructor directly.
                 // However, following the diff, they are placed here.
                 // Assuming _terminalView and _scanController are initialized before this point or are null-checked.
-                _terminalView?.SetWorkingDirectory(path);
-                // _versionController.ScanController = _scanController; // _scanController is not defined in the provided context
-                _terminalView.VersionController = _versionController;
+                // Moved TerminalView config to after initialization
 
                 // Load workspace state (assuming this method exists)
                 // RestoreWorkspaceState();
@@ -472,6 +470,9 @@ namespace Linage.GUI
 
             // 4. Debug/Terminal (Bottom Panel)
             _terminalView = new TerminalView { Dock = DockStyle.Fill };
+            _terminalView.VersionController = _versionController;
+            if (!string.IsNullOrEmpty(_currentRepository)) _terminalView.SetWorkingDirectory(_currentRepository);
+            
             _terminalView.OnProjectLoadRequested += async (path) => await LoadProjectAsync(path);
             _debugView = new DebugView { Dock = DockStyle.Fill };
 

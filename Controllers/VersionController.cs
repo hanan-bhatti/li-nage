@@ -63,13 +63,18 @@ namespace Linage.Controllers
                 _fileService = new FileService(_hashService);
                 _credentialStore = new CredentialStore();
                 _authService = new AuthenticationService(_credentialStore);
+                AuthService = _authService;
                 _authController = new AuthController(_authService);
                 
                 // Services
                 _changeDetector = new ChangeDetector(Directory.GetCurrentDirectory()); // Default to storage root?
+                ChangeDetector = _changeDetector;
+                
+                RemoteService = new RemoteService(_metadataStore);
                 
                 // Lazy initialize graph service (requires repo path)
                 _graphService = new VersionGraphService(_metadataStore);
+                GraphService = _graphService;
 
                 InitializationResult = Core.Results.Result.Ok();
             }
@@ -86,10 +91,15 @@ namespace Linage.Controllers
             _fileService = new FileService(_hashService);
             _credentialStore = new CredentialStore(); 
             _authService = new AuthenticationService(_credentialStore);
+            AuthService = _authService;
             _authController = new AuthController(_authService);
             
             _changeDetector = new ChangeDetector(repositoryRoot);
+            ChangeDetector = _changeDetector;
             _graphService = new VersionGraphService(_metadataStore);
+            GraphService = _graphService;
+            
+            RemoteService = new RemoteService(_metadataStore);
             
             InitializationResult = Core.Results.Result.Ok();
         }
