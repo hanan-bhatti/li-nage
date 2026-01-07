@@ -131,6 +131,10 @@ namespace Linage.Infrastructure
                 .Property(l => l.CommitId)
                 .IsOptional();
 
+            modelBuilder.Entity<LineChange>()
+                .Property(l => l.FilePath)
+                .HasMaxLength(1000);
+
             // Branch Configuration
             modelBuilder.Entity<Branch>()
                 .HasKey(b => b.BranchId);

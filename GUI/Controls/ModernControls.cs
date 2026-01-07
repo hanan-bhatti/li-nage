@@ -106,10 +106,11 @@ namespace Linage.GUI.Controls
         public ModernTabControl()
         {
             this.DrawMode = TabDrawMode.OwnerDrawFixed;
-            this.Padding = new Point(12, 6); // Using spacing system (12px = Spacing.Small)
+            this.Padding = new Point(0, 0); // Minimal padding for clean look
             this.SizeMode = TabSizeMode.Fixed;
             this.ItemSize = new Size(150, 35);
             this.DoubleBuffered = true;
+            this.Multiline = false;
         }
 
         protected override void OnDrawItem(DrawItemEventArgs e)
@@ -243,6 +244,28 @@ namespace Linage.GUI.Controls
             this.ItemSize = new Size(Math.Min(maxWidth, MaxTabWidth), 35);
             this.Invalidate();
         }
+
+        /// <summary>
+        /// Override OnPaint to remove white border around the tab control area (VS Code minimal style)
+        /// </summary>
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            // Suppress the default border by not drawing it
+            // The background color should already be set correctly
+        }
+
+        /// <summary>
+        /// Override to customize the tab page content area background
+        /// </summary>
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            // Fill the entire control with dark background to avoid white showing
+            using (var brush = new SolidBrush(ModernTheme.BackColor))
+            {
+                e.Graphics.FillRectangle(brush, this.ClientRectangle);
+            }
+        }
     }
 
     // --- Modern Tree View ---
@@ -261,7 +284,7 @@ namespace Linage.GUI.Controls
             this.BackColor = ModernTheme.SurfaceColor;
             this.ForeColor = ModernTheme.TextPrimary;
             this.LineColor = ModernTheme.BorderColor;
-            this.ItemHeight = 22; // Compact
+            this.ItemHeight = 28; // Modern, taller rows (VS Code style is usually 22, but 28 feels better for touch/modern)
             this.BorderStyle = BorderStyle.None;
             this.DoubleBuffered = true; // Prevent flicker
         }
@@ -284,12 +307,12 @@ namespace Linage.GUI.Controls
             // 1. Background
             if ((e.State & TreeNodeStates.Selected) != 0)
             {
-                using (var brush = new SolidBrush(ModernTheme.SelectionBack)) // Blueish
+                using (var brush = new SolidBrush(ModernTheme.SelectionBack)) 
                     g.FillRectangle(brush, bounds);
             }
             else if ((e.State & TreeNodeStates.Hot) != 0)
             {
-                using (var brush = new SolidBrush(ModernTheme.TabHover)) // Subtle Hover
+                using (var brush = new SolidBrush(ModernTheme.TabHover)) 
                     g.FillRectangle(brush, bounds);
             }
             else
@@ -299,10 +322,11 @@ namespace Linage.GUI.Controls
             }
 
             // 2. Indentation
-            int indent = 16;
-            int left = bounds.Left + (node.Level * indent) + 5;
+            int indent = 20; // Slightly wider indentation
+            int left = bounds.Left + (node.Level * indent) + 8;
 
             // 3. Chevron (Expand/Collapse)
+            // Draw only if it has children
             if (node.Nodes.Count > 0)
             {
                 using (var pen = new Pen(ModernTheme.TextSecondary, 1.5f))
@@ -314,14 +338,14 @@ namespace Linage.GUI.Controls
                     if (node.IsExpanded)
                     {
                         // Down Arrow (v)
-                        g.DrawLine(pen, cx - 3, cy - 2, cx, cy + 2);
-                        g.DrawLine(pen, cx, cy + 2, cx + 3, cy - 2);
+                        g.DrawLine(pen, cx - 4, cy - 2, cx, cy + 2);
+                        g.DrawLine(pen, cx, cy + 2, cx + 4, cy - 2);
                     }
                     else
                     {
                         // Right Arrow (>)
-                        g.DrawLine(pen, cx - 2, cy - 3, cx + 2, cy);
-                        g.DrawLine(pen, cx + 2, cy, cx - 2, cy + 3);
+                        g.DrawLine(pen, cx - 2, cy - 4, cx + 2, cy);
+                        g.DrawLine(pen, cx + 2, cy, cx - 2, cy + 4);
                     }
                 }
             }
@@ -329,17 +353,20 @@ namespace Linage.GUI.Controls
             left += 16; // Space after chevron
 
             // 4. Icon (Folder/File) - Programmatic Drawing
-            DrawIcon(g, node, left, bounds.Top + (bounds.Height - 14) / 2);
-            left += 20; // Space after icon
+            DrawIcon(g, node, left, bounds.Top + (bounds.Height - 16) / 2); // Center 16px icon
+            left += 22; // Space after icon
 
             // 5. Text
             Color textColor = (e.State & TreeNodeStates.Selected) != 0 ? Color.White : 
                               (node.NodeFont != null ? node.ForeColor : this.ForeColor);
             
-            // Special color for ignored/hidden files? (Could check tag or name)
             if (node.Text.StartsWith(".")) textColor = ModernTheme.TextSecondary;
 
-            TextRenderer.DrawText(g, node.Text, this.Font, new Point(left, bounds.Top + 4), textColor, TextFormatFlags.Left | TextFormatFlags.Top);
+            // Vertically center text
+            TextRenderer.DrawText(g, node.Text, this.Font, 
+                new Rectangle(left, bounds.Top, bounds.Width - left, bounds.Height), 
+                textColor, 
+                TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
         }
 
         protected override void OnMouseDown(MouseEventArgs e)
@@ -348,18 +375,11 @@ namespace Linage.GUI.Controls
             var info = this.HitTest(e.Location);
             if (info.Node != null && e.Button == MouseButtons.Left)
             {
-                // Calculate Chevron Bounds
-                // Logic must match OnDrawNode: left = bounds.Left + (level * 16) + 5
-                int indent = 16;
-                int left = info.Node.Bounds.Left + (info.Node.Level * indent) + 5;
-                // Chevron is roughly at left+4, width ~8px. 
-                // Let's define a click zone: from left to left+16
+                int indent = 20;
+                int left = info.Node.Bounds.Left + (info.Node.Level * indent) + 8;
                 
-                // Note: TreeView.HitTest gives the node even if we click strictly on the indent area? 
-                // HitTestLocation.Indent exists.
-                
-                if (info.Location == TreeViewHitTestLocations.Indent || 
-                   (e.X >= left && e.X <= left + 16))
+                // Chevron click zone (generous)
+                if (e.X >= left - 5 && e.X <= left + 20)
                 {
                     if (info.Node.IsExpanded) info.Node.Collapse();
                     else info.Node.Expand();
@@ -372,12 +392,8 @@ namespace Linage.GUI.Controls
 
         private void DrawIcon(Graphics g, TreeNode node, int x, int y)
         {
-            // Simple Vector Icons
-            // Size 14x14
-            int size = 14;
-            
-            // OPTIMIZATION: Do not use File.Exists/Directory.Exists here!
-            // Use ImageIndex as the source of truth (0 = Folder, 1 = File)
+            // Vector Icons - Size 16x16
+            int size = 16;
             bool isFolder = node.ImageIndex == 0;
 
             if (isFolder)
@@ -387,9 +403,9 @@ namespace Linage.GUI.Controls
                 using (var brush = new SolidBrush(folderColor))
                 {
                     // Main body
-                    g.FillRectangle(brush, x, y + 2, size, size - 2);
+                    g.FillRectangle(brush, x, y + 2, size, size - 3);
                     // Tab
-                    g.FillRectangle(brush, x, y, size / 2, 2);
+                    g.FillRectangle(brush, x, y, size / 2, 3);
                 }
             }
             else
@@ -401,11 +417,14 @@ namespace Linage.GUI.Controls
 
                 switch (ext)
                 {
-                    case ".cs": fileColor = Color.FromArgb(23, 134, 0); letter = "C#"; break;
+                    case ".cs": fileColor = Color.FromArgb(23, 134, 0); letter = "#"; break;
                     case ".json": fileColor = Color.Yellow; letter = "{}"; break;
                     case ".xml": fileColor = Color.Orange; letter = "<>"; break;
                     case ".txt": fileColor = ModernTheme.TextSecondary; letter = "≡"; break;
                     case ".md": fileColor = Color.LightBlue; letter = "M↓"; break;
+                    case ".csproj": fileColor = Color.Purple; letter = "C"; break;
+                    case ".sln": fileColor = Color.Purple; letter = "S"; break;
+                    case ".gitignore": fileColor = Color.OrangeRed; letter = "git"; break;
                     default: fileColor = ModernTheme.TextSecondary; break; 
                 }
 
@@ -423,8 +442,10 @@ namespace Linage.GUI.Controls
                 {
                     using (var b = new SolidBrush(fileColor))
                     {
-                        var f = new Font("Arial", 6f, FontStyle.Bold); // Tiny font
-                        g.DrawString(letter, f, b, x + (size - g.MeasureString(letter, f).Width)/2 + 1, y + 2);
+                        var f = new Font("Arial", 6f, FontStyle.Bold); 
+                        // Center letter
+                        var ts = g.MeasureString(letter, f);
+                        g.DrawString(letter, f, b, x + (size - ts.Width)/2 + 1, y + (size - ts.Height)/2 + 1);
                     }
                 }
             }

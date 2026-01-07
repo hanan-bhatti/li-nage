@@ -67,7 +67,6 @@ namespace Linage.GUI
         public StagingView()
         {
             InitializeComponent();
-            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "StagingView.cs");
         }
 
         private void InitializeComponent()
@@ -185,7 +184,7 @@ namespace Linage.GUI
             if (string.IsNullOrWhiteSpace(_commitMessage.Text))
             {
                 DebugLogger.Warn("  -> Commit aborted: empty message");
-                MessageBox.Show("Please enter a commit message.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Linage.Infrastructure.Services.NotificationManager.Instance.ShowWarning("Validation", "Please enter a commit message.");
                 return;
             }
 

@@ -15,7 +15,6 @@ namespace Linage.GUI
         public AIHistoryView()
         {
             this.BackColor = System.Drawing.Color.AliceBlue;
-            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "AIHistoryView.cs");
         }
 
         public void ApplyTheme()

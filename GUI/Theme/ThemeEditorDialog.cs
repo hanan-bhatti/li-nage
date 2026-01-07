@@ -16,7 +16,6 @@ namespace Linage.GUI.Theme
         {
             InitializeComponent();
             LoadThemes();
-            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "ThemeEditorDialog.cs");
         }
 
         private void InitializeComponent()
@@ -191,7 +190,7 @@ namespace Linage.GUI.Theme
         private void OnSave(object sender, EventArgs e)
         {
             ThemeManager.Instance.SwitchTheme(_editingTheme);
-            MessageBox.Show("Theme saved successfully!", "Theme Manager");
+            Linage.Infrastructure.Services.NotificationManager.Instance.ShowSuccess("Theme Manager", "Theme saved successfully!");
         }
     }
 }

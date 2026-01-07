@@ -28,7 +28,6 @@ namespace Linage.GUI
         {
             InitializeComponent();
             SetupStyles();
-            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "WelcomeView.cs");
         }
 
         private void InitializeComponent()

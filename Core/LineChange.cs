@@ -20,9 +20,12 @@ namespace Linage.Core
         public string OldHash { get; set; }
         public string NewHash { get; set; }
         public ChangeType ChangeType { get; set; }
-        
+
         // Associate with a commit for tracking
         public Guid? CommitId { get; set; }
+
+        // File path for line-level blame (relative path within repository)
+        public string FilePath { get; set; }
         
         // Spec 3.2.5 mentions Timestamp and Author, adding them as optional or future-proof props
         // though 4.2.4 strictly lists the core logic props.

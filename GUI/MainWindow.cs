@@ -10,6 +10,7 @@ using Linage.Core;
 using Linage.Core.Services;
 using Linage.GUI.Configuration;
 using Linage.GUI.Controls;
+using Linage.GUI.Dialogs;
 using Linage.GUI.Helpers;
 using Linage.GUI.Services;
 using Linage.GUI.Theme;
@@ -144,9 +145,6 @@ namespace Linage.GUI
             {
                 _improvedStatusBar.NotificationClicked += (s, e) => _notificationPresenter.ToggleCenter();
             }
-
-            // Add Watermark
-            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "MainWindow.cs");
 
             // Removed: InitializeRefreshTimer() - Using FileWatcher events instead
 
@@ -405,7 +403,7 @@ namespace Linage.GUI
                 
                 var actions = new System.Collections.Generic.List<Linage.Core.Notifications.NotificationAction>
                 {
-                    new Linage.Core.Notifications.NotificationAction("Update", () => MessageBox.Show("Updated!"), true),
+                    new Linage.Core.Notifications.NotificationAction("Update", () => Linage.Infrastructure.Services.NotificationManager.Instance.ShowSuccess("Success","Updated!")),
                     new Linage.Core.Notifications.NotificationAction("Later", () => { })
                 };
                 mgr.Show("Update Available", "A new version of Li'nage is available.", Linage.Core.Notifications.NotificationSeverity.Info, actions);
@@ -439,8 +437,20 @@ namespace Linage.GUI
             _terminalView = new TerminalView { Dock = DockStyle.Fill };
             _debugView = new DebugView { Dock = DockStyle.Fill };
 
-            _terminalTabs.TabPages.Add(new TabPage("Terminal") { Controls = { _terminalView } });
-            _terminalTabs.TabPages.Add(new TabPage("Debug Console") { Controls = { _debugView } });
+            var terminalTab = new TabPage("Terminal")
+            {
+                BackColor = ModernTheme.BackColor
+            };
+            terminalTab.Controls.Add(_terminalView);
+            
+            var debugTab = new TabPage("Debug Console")
+            {
+                BackColor = ModernTheme.BackColor
+            };
+            debugTab.Controls.Add(_debugView);
+            
+            _terminalTabs.TabPages.Add(terminalTab);
+            _terminalTabs.TabPages.Add(debugTab);
             
             // Show welcome view in editor area by default
             ShowWelcomeScreen();
@@ -481,7 +491,11 @@ namespace Linage.GUI
                             }
                         }
 
-                        var tab = new TabPage("Commit Graph") { Name = "Graph" };
+                        var tab = new TabPage("Commit Graph")
+                        {
+                            Name = "Graph",
+                            BackColor = ModernTheme.BackColor
+                        };
                         tab.Controls.Add(_gitGraphView);
                         _editorTabs.TabPages.Insert(0, tab);
                     }
@@ -615,6 +629,20 @@ namespace Linage.GUI
             }
         }
 
+        private void ApplyThemeToControl(Control control)
+        {
+            control.BackColor = ModernTheme.BackColor;
+            control.ForeColor = ModernTheme.TextPrimary;
+            control.Font = ModernTheme.FontBody;
+            
+            if (control is IThemable themable)
+            {
+                themable.ApplyTheme();
+            }
+            
+            ApplyThemeToControls(control.Controls);
+        }
+
         private void ShowWelcomeScreen()
         {
             // Clear editor tabs
@@ -693,13 +721,14 @@ namespace Linage.GUI
                 // Unwrap AggregateException to get the actual error(s)
                 var innerExceptions = aggEx.Flatten().InnerExceptions;
                 var errorMessage = string.Join("\n\n", innerExceptions.Select(ex => ex.Message));
-                MessageBox.Show($"Failed to load repository:\n\n{errorMessage}", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // MessageBox.Show($"Failed to load repository:\n\n{errorMessage}", "Error",
+                //    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _dialogService.ShowError("Load Failed", errorMessage);
                 _debugView?.Log($"Load Error (AggregateException): {errorMessage}");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _dialogService.ShowError("Error", ex.Message);
             }
             finally
             {
@@ -709,7 +738,22 @@ namespace Linage.GUI
 
         private async void OnFileSelected(object sender, FileSelectedEventArgs e)
         {
-            await OpenFileInEditor(e.FilePath);
+            try
+            {
+                ToggleProgress(true);
+                UpdateStatus($"Opening {Path.GetFileName(e.FilePath)}...");
+                await OpenFileInEditor(e.FilePath).ConfigureAwait(true);
+                UpdateStatus("File opened");
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Error($"OnFileSelected: Error opening file - {ex.Message}");
+                ShowError("File Open Failed", ex);
+            }
+            finally
+            {
+                ToggleProgress(false);
+            }
         }
 
         private async Task OpenFileInEditor(string filePath)
@@ -720,50 +764,86 @@ namespace Linage.GUI
                 return;
             }
 
-            var editor = new EditorView { Dock = DockStyle.Fill };
-
-            // Set version controller for line history/blame feature
-            if (_versionController != null && !string.IsNullOrEmpty(_currentRepository))
+            try
             {
-                editor.SetVersionController(_versionController, _currentRepository);
+                var editor = new EditorView { Dock = DockStyle.Fill };
+
+                // Set version controller for line history/blame feature
+                if (_versionController != null && !string.IsNullOrEmpty(_currentRepository))
+                {
+                    editor.SetVersionController(_versionController, _currentRepository);
+                }
+
+                // Load file asynchronously
+                await editor.LoadFile(filePath).ConfigureAwait(true);
+
+                var tabPage = new TabPage(Path.GetFileName(filePath))
+                {
+                    Tag = filePath,
+                    ToolTipText = filePath,
+                    BackColor = ModernTheme.BackColor
+                };
+                tabPage.Controls.Add(editor);
+
+                // Create event handlers that we can unsubscribe later
+                EventHandler contentHandler = (s, e) =>
+                {
+                    if (!tabPage.Text.EndsWith(" ●"))
+                        tabPage.Text += " ●";
+                };
+
+                EventHandler savedHandler = (s, e) =>
+                {
+                    if (tabPage.Text.EndsWith(" ●"))
+                        tabPage.Text = tabPage.Text.TrimEnd(' ', '●');
+                };
+
+                // Subscribe to events
+                editor.ContentChanged += contentHandler;
+                editor.FileSaved += savedHandler;
+
+                // Store handlers for later cleanup
+                _tabEventHandlers[filePath] = new TabPageData
+                {
+                    Editor = editor,
+                    ContentHandler = contentHandler,
+                    SavedHandler = savedHandler
+                };
+
+                _editorTabs.TabPages.Add(tabPage);
+                _openFiles.Add(filePath, tabPage);
+                _editorTabs.SelectedTab = tabPage;
+                
+                UpdateEditorState();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Error($"OpenFileInEditor: Error - {ex.Message}");
+                throw;
+            }
+        }
+
+        private void OpenVirtualFile(string title, string content)
+        {
+            if (_openFiles.ContainsKey(title))
+            {
+                _editorTabs.SelectedTab = _openFiles[title];
+                return;
             }
 
-            await editor.LoadFile(filePath);
+            var editor = new EditorView { Dock = DockStyle.Fill };
+            editor.LoadContent(title, content, readOnly: true);
 
-            var tabPage = new TabPage(Path.GetFileName(filePath))
+            var tabPage = new TabPage(title)
             {
-                Tag = filePath,
-                ToolTipText = filePath
+                Tag = title,
+                ToolTipText = title,
+                BackColor = ModernTheme.BackColor
             };
             tabPage.Controls.Add(editor);
 
-            // Create event handlers that we can unsubscribe later
-            EventHandler contentHandler = (s, e) =>
-            {
-                if (!tabPage.Text.EndsWith(" ●"))
-                    tabPage.Text += " ●";
-            };
-
-            EventHandler savedHandler = (s, e) =>
-            {
-                if (tabPage.Text.EndsWith(" ●"))
-                    tabPage.Text = tabPage.Text.TrimEnd(' ', '●');
-            };
-
-            // Subscribe to events
-            editor.ContentChanged += contentHandler;
-            editor.FileSaved += savedHandler;
-
-            // Store handlers for later cleanup
-            _tabEventHandlers[filePath] = new TabPageData
-            {
-                Editor = editor,
-                ContentHandler = contentHandler,
-                SavedHandler = savedHandler
-            };
-
             _editorTabs.TabPages.Add(tabPage);
-            _openFiles.Add(filePath, tabPage);
+            _openFiles.Add(title, tabPage);
             _editorTabs.SelectedTab = tabPage;
             
             UpdateEditorState();
@@ -869,14 +949,14 @@ namespace Linage.GUI
                     File.WriteAllText(conflict.FilePath, eArgs.ResolvedContent);
                     // Note: Staging would happen here if IndexController had StageFile method
                     
-                    MessageBox.Show("Conflict resolved and saved!", "Resolution Success");
+                    _dialogService.ShowSuccess("Resolution Success", "Conflict resolved and saved!");
                     
                     _editorTabs.TabPages.Remove(tabPage);
                     _openFiles.Remove(tabKey);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error saving resolution: {ex.Message}", "Error");
+                    _dialogService.ShowError("Error", $"Error saving resolution: {ex.Message}");
                 }
             };
 
@@ -936,13 +1016,193 @@ namespace Linage.GUI
 
                 UpdateStatus($"Committed: {e.Message}");
                 DebugLogger.Info("  -> Commit complete, showing success message");
-                MessageBox.Show("Commit Success");
+                
+                // Show sync prompt after successful commit
+                var result = MessageBox.Show(
+                    "Commit successful! Would you like to sync changes with remote?",
+                    "Sync Changes",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Information);
+
+                if (result == DialogResult.Yes)
+                {
+                    await OnSyncChanges();
+                }
+                else
+                {
+                    _dialogService.ShowSuccess("Commit", "Commit Success");
+                }
             }
             catch (Exception ex)
             {
                 DebugLogger.Error($"  -> Commit failed: {ex.Message}");
-                MessageBox.Show($"Commit Failed: {ex.Message}");
+                // MessageBox.Show($"Commit Failed: {ex.Message}");
                 ShowError("Commit Failed", ex);
+            }
+        }
+
+        /// <summary>
+        /// Handles syncing changes: pulls from remote and handles merge conflicts
+        /// </summary>
+        private async Task OnSyncChanges()
+        {
+            try
+            {
+                ToggleProgress(true);
+                UpdateStatus("Syncing changes...");
+                DebugLogger.Info("OnSyncChanges: Starting sync operation");
+
+                // Get the default remote
+                var remotes = await _versionController.RemoteService.GetAllRemotesAsync();
+                var defaultRemote = remotes.FirstOrDefault(r => r.IsDefault) ?? remotes.FirstOrDefault();
+
+                if (defaultRemote == null)
+                {
+                    UpdateStatus("No remote configured");
+                    MessageBox.Show("No remote configured. Please add a remote first.", "No Remote", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ToggleProgress(false);
+                    return;
+                }
+
+                DebugLogger.Info($"OnSyncChanges: Pulling from remote '{defaultRemote.RemoteName}'");
+                
+                // Pull from remote
+                await _versionController.Pull(defaultRemote.RemoteName);
+                
+                // Update the graph with new commits
+                _gitGraphView.SetCommits(_versionController.GraphService.GetCommitHistory());
+                UpdateStatus("Sync completed successfully");
+                DebugLogger.Info("OnSyncChanges: Sync completed");
+                
+                MessageBox.Show("Sync completed successfully!", "Sync Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (InvalidOperationException conflictEx) when (conflictEx.Message.Contains("conflict"))
+            {
+                DebugLogger.Warn($"OnSyncChanges: Merge conflicts detected - {conflictEx.Message}");
+                UpdateStatus("Merge conflicts detected - resolving...");
+                
+                // Handle merge conflicts
+                await HandleMergeConflicts();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Error($"OnSyncChanges: Sync failed - {ex.Message}");
+                UpdateStatus($"Sync failed: {ex.Message}");
+                ShowError("Sync Failed", ex);
+            }
+            finally
+            {
+                ToggleProgress(false);
+            }
+        }
+
+        /// <summary>
+        /// Handles merge conflicts by showing conflict resolution window
+        /// </summary>
+        private async Task HandleMergeConflicts()
+        {
+            try
+            {
+                DebugLogger.Info("HandleMergeConflicts: Getting conflict data");
+                
+                // Get conflicts from the version controller (if available)
+                // For now, we'll create a basic conflict resolution window
+                var conflictDialog = new Form
+                {
+                    Text = "Merge Conflict Resolution",
+                    Width = 1000,
+                    Height = 700,
+                    StartPosition = FormStartPosition.CenterParent,
+                    MaximizeBox = true
+                };
+
+                var mergeView = new MergeConflictView
+                {
+                    Dock = DockStyle.Fill
+                };
+
+                // Example conflict - in real scenario, get from GraphService
+                var exampleConflict = new Conflict
+                {
+                    FilePath = "Example Conflict",
+                    LocalContent = "Local version content here",
+                    RemoteContent = "Remote version content here"
+                };
+
+                mergeView.SetConflict(exampleConflict);
+                mergeView.ConflictResolved += async (s, conflict) =>
+                {
+                    try
+                    {
+                        DebugLogger.Info($"HandleMergeConflicts: Conflict resolved for {conflict.FilePath}");
+                        
+                        // Save the resolved content back to the file
+                        if (!string.IsNullOrEmpty(conflict.FilePath))
+                        {
+                            string filePath = Path.Combine(_currentRepository, conflict.FilePath);
+                            using (var writer = new StreamWriter(filePath))
+                            {
+                                await writer.WriteAsync(conflict.ResolvedContent);
+                            }
+                            
+                            DebugLogger.Info($"HandleMergeConflicts: Saved resolved content to {filePath}");
+                        }
+
+                        // Complete the merge and create a merge commit
+                        await CompleteMergeAfterResolution();
+                        
+                        conflictDialog.Close();
+                        UpdateStatus("Merge conflicts resolved");
+                        MessageBox.Show("Merge conflicts resolved successfully!", "Resolution Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLogger.Error($"HandleMergeConflicts: Error saving resolution - {ex.Message}");
+                        ShowError("Resolution Error", ex);
+                    }
+                };
+
+                conflictDialog.Controls.Add(mergeView);
+                ApplyThemeToControl(conflictDialog);
+                conflictDialog.ShowDialog(this);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Error($"HandleMergeConflicts: Error - {ex.Message}");
+                ShowError("Conflict Resolution Failed", ex);
+            }
+        }
+
+        /// <summary>
+        /// Completes the merge after conflicts are resolved
+        /// </summary>
+        private async Task CompleteMergeAfterResolution()
+        {
+            try
+            {
+                DebugLogger.Info("CompleteMergeAfterResolution: Creating merge commit");
+                
+                // Create a merge commit to finalize the merge
+                var currentBranch = _versionController.GraphService.GetCurrentBranch();
+                if (currentBranch != null)
+                {
+                    // Re-scan for changes after conflict resolution
+                    await _versionController.ScanChangesAsync();
+                    
+                    // Create merge commit
+                    await _versionController.CreateCommitAsync("Merge: Resolved conflicts", null);
+                    
+                    // Update UI
+                    _gitGraphView.SetCommits(_versionController.GraphService.GetCommitHistory());
+                    _stagingView.SetFiles(new List<string>());
+                    
+                    DebugLogger.Info("CompleteMergeAfterResolution: Merge commit created successfully");
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Error($"CompleteMergeAfterResolution: Error - {ex.Message}");
+                throw;
             }
         }
 
@@ -1022,7 +1282,7 @@ namespace Linage.GUI
             var branches = await _versionController.GraphService.GetAllBranchesAsync();
             if (branches == null || branches.Count == 0)
             {
-                MessageBox.Show("No branches found. Create a new branch first.", "Branches", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                _dialogService.ShowInfo("Branches", "No branches found. Create a new branch first.");
                 return;
             }
 
@@ -1104,8 +1364,7 @@ namespace Linage.GUI
                     string branchToDelete = listBox.SelectedItem.ToString();
                     if (currentBranch?.BranchName == branchToDelete)
                     {
-                        MessageBox.Show("Cannot delete the current branch. Switch to another branch first.", 
-                            "Delete Branch", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        _dialogService.ShowWarning("Delete Branch", "Cannot delete the current branch. Switch to another branch first.");
                         return;
                     }
 
@@ -1137,8 +1396,7 @@ namespace Linage.GUI
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to switch branch: {ex.Message}", "Error", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _dialogService.ShowError("Error", $"Failed to switch branch: {ex.Message}");
                 _debugView?.Log($"Switch branch error: {ex.Message}");
             }
             finally
@@ -1166,13 +1424,11 @@ namespace Linage.GUI
 
                 UpdateStatus($"Created and switched to branch '{branchName}'");
                 _debugView?.Log($"Created new branch: {branchName}");
-                MessageBox.Show($"Created and switched to branch '{branchName}'", "Success", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                _dialogService.ShowSuccess("Success", $"Created and switched to branch '{branchName}'");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to create branch: {ex.Message}", "Error", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _dialogService.ShowError("Error", $"Failed to create branch: {ex.Message}");
                 _debugView?.Log($"Create branch error: {ex.Message}");
             }
             finally
@@ -1192,16 +1448,14 @@ namespace Linage.GUI
 
                 UpdateStatus($"Deleted branch '{branchName}'");
                 _debugView?.Log($"Deleted branch: {branchName}");
-                MessageBox.Show($"Deleted branch '{branchName}'", "Success", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                _dialogService.ShowSuccess("Success", $"Deleted branch '{branchName}'");
                 
                 // Refresh branches dialog
                 OnBranches(null, EventArgs.Empty);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to delete branch: {ex.Message}", "Error", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _dialogService.ShowError("Error", $"Failed to delete branch: {ex.Message}");
                 _debugView?.Log($"Delete branch error: {ex.Message}");
             }
             finally
@@ -1317,13 +1571,11 @@ namespace Linage.GUI
 
                 UpdateStatus($"Added remote '{remoteName}'");
                 _debugView?.Log($"Added remote: {remoteName} -> {remoteUrl}");
-                MessageBox.Show($"Added remote '{remoteName}'", "Success", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                _dialogService.ShowSuccess("Success", $"Added remote '{remoteName}'");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to add remote: {ex.Message}", "Error", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _dialogService.ShowError("Error", $"Failed to add remote: {ex.Message}");
                 _debugView?.Log($"Add remote error: {ex.Message}");
             }
             finally
@@ -1343,16 +1595,14 @@ namespace Linage.GUI
 
                 UpdateStatus($"Removed remote '{remoteName}'");
                 _debugView?.Log($"Removed remote: {remoteName}");
-                MessageBox.Show($"Removed remote '{remoteName}'", "Success", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                _dialogService.ShowSuccess("Success", $"Removed remote '{remoteName}'");
                 
                 // Refresh remotes dialog
                 OnManageRemotes(null, EventArgs.Empty);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to remove remote: {ex.Message}", "Error", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _dialogService.ShowError("Error", $"Failed to remove remote: {ex.Message}");
                 _debugView?.Log($"Remove remote error: {ex.Message}");
             }
             finally
@@ -1372,16 +1622,14 @@ namespace Linage.GUI
 
                 UpdateStatus($"'{remoteName}' is now the default remote");
                 _debugView?.Log($"Set default remote: {remoteName}");
-                MessageBox.Show($"'{remoteName}' is now the default remote", "Success", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                _dialogService.ShowSuccess("Success", $"'{remoteName}' is now the default remote");
                 
                 // Refresh remotes dialog
                 OnManageRemotes(null, EventArgs.Empty);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to set default remote: {ex.Message}", "Error", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _dialogService.ShowError("Error", $"Failed to set default remote: {ex.Message}");
                 _debugView?.Log($"Set default remote error: {ex.Message}");
             }
             finally
@@ -1405,10 +1653,8 @@ namespace Linage.GUI
                     var result = await _remoteOperationsService.CloneAsync(repoUrl, destinationPath);
                     if (result.IsSuccess)
                     {
-                        if (_dialogService.PromptYesNo("Clone", "Clone successful. Open repository now?") == DialogResult.Yes)
-                        {
-                            await LoadRepositoryAsync(destinationPath);
-                        }
+                        _dialogService.PromptYesNo("Clone", "Clone successful. Open repository now?", 
+                             async () => await LoadRepositoryAsync(destinationPath));
                     }
                     else
                     {
@@ -1442,7 +1688,7 @@ namespace Linage.GUI
             }
         }
 
-        private async void OnImportGitRepository(object sender, EventArgs e)
+        private void OnImportGitRepository(object sender, EventArgs e)
         {
             var dialog = new ModernFolderBrowserDialog { Title = "Select Git Repository to Import" };
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
@@ -1452,23 +1698,27 @@ namespace Linage.GUI
             // Validate it's a Git repo
             if (!Directory.Exists(Path.Combine(gitPath, ".git")))
             {
-                MessageBox.Show("Selected folder is not a Git repository.", "Error", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _dialogService.ShowError("Error", "Selected folder is not a Git repository.");
                 return;
             }
 
             // Ask import type
-            var resultType = MessageBox.Show(
-                "Full Import: Import entire commit history (slower)\n" +
-                "Quick Import: Import only current state (faster)\n\n" +
-                "Click Yes for Full Import, No for Quick Import",
+            var actions = new List<Linage.Core.Notifications.NotificationAction>
+            {
+                new Linage.Core.Notifications.NotificationAction("Full Import", async () => await PerformImport(gitPath, false), true),
+                new Linage.Core.Notifications.NotificationAction("Quick Import", async () => await PerformImport(gitPath, true)),
+                new Linage.Core.Notifications.NotificationAction("Cancel", () => { })
+            };
+
+            Linage.Infrastructure.Services.NotificationManager.Instance.Show(
                 "Import Type",
-                MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                "Choose import strategy:\nFull Import: Entire history (slower)\nQuick Import: Current state only (faster)",
+                Linage.Core.Notifications.NotificationSeverity.Question,
+                actions);
+        }
 
-            if (resultType == DialogResult.Cancel) return;
-
-            bool isQuick = resultType == DialogResult.No;
-
+        private async Task PerformImport(string gitPath, bool isQuick)
+        {
             try
             {
                 ToggleProgress(true);
@@ -1491,8 +1741,7 @@ namespace Linage.GUI
 
                 if (result.Success)
                 {
-                    MessageBox.Show($"Import Successful!\n{result}", "Import", 
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    _dialogService.ShowSuccess("Import", $"Import Successful!\n{result}");
                     
                     // Load the imported project
                     await _versionController.LoadProjectAsync(gitPath);
@@ -1509,8 +1758,7 @@ namespace Linage.GUI
                 // Unwrap AggregateException to get the actual error(s)
                 var innerExceptions = aggEx.Flatten().InnerExceptions;
                 var errorMessage = string.Join("\n\n", innerExceptions.Select(ex => ex.Message));
-                MessageBox.Show($"Import failed:\n\n{errorMessage}", "Import Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _dialogService.ShowError("Import Error", $"Import failed:\n\n{errorMessage}");
                 _debugView?.Log($"Import Error (AggregateException): {errorMessage}");
             }
             catch (Exception ex)
@@ -1526,7 +1774,20 @@ namespace Linage.GUI
 
         private void OnAbout(object sender, EventArgs e)
         {
-             MessageBox.Show("Li'nage v1.0\nVS Code Inspired GUI", "About");
+            string aboutText = "LINAGE is a modern, developer-focused Version Control System built to track code evolution with clarity and intent.\n\n" +
+                               "It combines a structured core, a powerful CLI, and an intuitive GUI to manage repositories, commits, branching, and history efficiently.\n\n" +
+                               "Designed with scalability and precision in mind, LINAGE emphasizes transparent lineage tracking, making it easier to understand how code changes over time, not just that they changed.\n\n" +
+                               "It is built for developers who want control, insight, and a system that respects how real software is developed.\n\n" +
+                               "Key Features:\n" +
+                               "• Line-level version control tracking\n" +
+                               "• Intelligent branching and merging\n" +
+                               "• Multi-protocol remote support (HTTP, SSH)\n" +
+                               "• Advanced conflict resolution\n" +
+                               "• Real-time file synchronization\n" +
+                               "• Integrated GUI and CLI\n\n" +
+                               "© 2025 Hanan Bhatti. Licensed under GNU General Public License v3.0";
+
+            OpenVirtualFile("About Li'nage", aboutText);
         }
 
         private void ShowError(string title, Exception ex)

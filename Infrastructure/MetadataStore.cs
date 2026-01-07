@@ -606,6 +606,39 @@ namespace Linage.Infrastructure
                 .ToList();
         }
 
+        /// <summary>
+        /// Gets the most recent line change for a specific file and line number.
+        /// Returns the commit that last modified this line.
+        /// </summary>
+        public async Task<LineChange> GetLineBlameAsync(string filePath, int lineNumber)
+        {
+            return await _context.LineChanges
+                .Where(lc => lc.FilePath == filePath && lc.LineNumber == lineNumber)
+                .OrderByDescending(lc => lc.Timestamp)
+                .FirstOrDefaultAsync()
+                .ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Gets all line changes for a specific file, useful for full-file blame.
+        /// Returns changes grouped by line number with the most recent change for each line.
+        /// </summary>
+        public async Task<List<LineChange>> GetFileBlameAsync(string filePath)
+        {
+            // Get the most recent change for each line number
+            var allChanges = await _context.LineChanges
+                .Where(lc => lc.FilePath == filePath)
+                .ToListAsync()
+                .ConfigureAwait(false);
+
+            // Group by line number and take the most recent change for each line
+            return allChanges
+                .GroupBy(lc => lc.LineNumber)
+                .Select(g => g.OrderByDescending(lc => lc.Timestamp).First())
+                .OrderBy(lc => lc.LineNumber)
+                .ToList();
+        }
+
         #endregion
 
         #region Remote Operations

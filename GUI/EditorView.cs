@@ -76,6 +76,7 @@ namespace Linage.GUI
         private Timer _typingTimer;
         private int _lastLineCount;
         private bool _isDirty;
+        private bool _isVirtual; // If true, file is not on disk
 
         // Events
         public event EventHandler FileSaved;
@@ -96,10 +97,18 @@ namespace Linage.GUI
                 
                 // ...
         
-                public EditorView()
+                private System.Windows.Forms.Timer _historyDebounceTimer;
+
+        public EditorView()
         {
             InitializeComponent();
-            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "EditorView.cs");
+            
+            _historyDebounceTimer = new System.Windows.Forms.Timer { Interval = 250 };
+            _historyDebounceTimer.Tick += async (s, e) => 
+            { 
+                _historyDebounceTimer.Stop(); 
+                await UpdateLineHistory(); 
+            };
         }
 
         private void InitializeComponent()
@@ -160,7 +169,12 @@ namespace Linage.GUI
             _codeEditor.SelectionColor = ModernTheme.TextPrimary;
             
             _codeEditor.TextChanged += OnTextChanged;
-            _codeEditor.SelectionChanged += (s, e) => UpdateLineHistory();
+            // Debounce selection change for history update
+            _codeEditor.SelectionChanged += (s, e) => 
+            { 
+                _historyDebounceTimer.Stop();
+                _historyDebounceTimer.Start();
+            };
             
             // No gutter - simplified for performance
             _codeEditor.VScrollHappened += (s, e) => {
@@ -269,42 +283,84 @@ namespace Linage.GUI
         {
             if (!File.Exists(filePath)) return;
 
+            // Temporarily disable events to prevent flooding during load
+            _codeEditor.TextChanged -= OnTextChanged;
+            // Note: We can't easily unsubscribe the lambda for SelectionChanged unless we stored it.
+            // But _historyDebounceTimer handles the SelectionChanged spam nicely now.
+            
+            // Suspend drawing for performance
+            NativeMethods.SuspendDrawing(_codeEditor);
+
             try
             {
                 _currentFilePath = filePath;
                 _lblCurrentFile.Text = $"📄 {Path.GetFileName(filePath)}";
                 
-                string content = File.ReadAllText(filePath);
+                // Read file asynchronously
+                string content = await Task.Run(() => File.ReadAllText(filePath)).ConfigureAwait(true);
                 
-                _codeEditor.TextChanged -= OnTextChanged;
+                // Set text (this is the heavy UI operation)
                 _codeEditor.Text = content;
                 
-                // Ensure all text is visible with correct color
-                _codeEditor.SelectionStart = 0;
-                _codeEditor.SelectionLength = _codeEditor.TextLength;
-                _codeEditor.SelectionColor = ModernTheme.TextPrimary;
+                // Reset Selection/View
                 _codeEditor.SelectionStart = 0;
                 _codeEditor.SelectionLength = 0;
+                _codeEditor.SelectionColor = ModernTheme.TextPrimary;
                 
-                // Full Highlight on Load (Async)
+                // Resume drawing before highlighting so the user sees *something*
+                NativeMethods.ResumeDrawing(_codeEditor);
+                
+                // Async Highlighting
                 _isHighlighting = true;
-                try { await _highlighter.HighlightAllAsync(); }
-                finally { _isHighlighting = false; }
-                
-                _codeEditor.TextChanged += OnTextChanged;
+                if (_highlighter != null)
+                {
+                    // This is now safer as it runs on background and applies on UI
+                    await _highlighter.HighlightAllAsync().ConfigureAwait(true); 
+                }
                 
                 IsDirty = false;
                 _lastLineCount = _codeEditor.Lines.Length;
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading file: {ex.Message}");
+                NativeMethods.ResumeDrawing(_codeEditor); // Ensure we resume if error
+                Linage.Infrastructure.DebugLogger.Error($"Error loading file {filePath}: {ex.Message}");
+                Linage.Infrastructure.Services.NotificationManager.Instance.ShowError("Error", $"Error loading file: {ex.Message}");
+            }
+            finally 
+            { 
+                _isHighlighting = false; 
+                _codeEditor.TextChanged += OnTextChanged;
+            }
+        }
+
+        public void LoadContent(string title, string content, bool readOnly = false)
+        {
+            _currentFilePath = title; // Virtual path/name
+            _isVirtual = true;
+            _lblCurrentFile.Text = $"ℹ️ {title}";
+
+            NativeMethods.SuspendDrawing(_codeEditor);
+            try
+            {
+                _codeEditor.Text = content;
+                _codeEditor.ReadOnly = readOnly;
+                _codeEditor.SelectionStart = 0;
+                _codeEditor.SelectionLength = 0;
+                _codeEditor.BackColor = readOnly ? ModernTheme.SurfaceLight : ModernTheme.BackColor;
+                
+                IsDirty = false;
+                _lastLineCount = _codeEditor.Lines.Length;
+            }
+            finally
+            {
+                NativeMethods.ResumeDrawing(_codeEditor);
             }
         }
 
         public void SaveFile()
         {
-            if (string.IsNullOrEmpty(_currentFilePath)) return;
+            if (string.IsNullOrEmpty(_currentFilePath) || _isVirtual || _codeEditor.ReadOnly) return;
 
             try
             {
@@ -316,7 +372,7 @@ namespace Linage.GUI
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error saving: {ex.Message}");
+                Linage.Infrastructure.Services.NotificationManager.Instance.ShowError("Error", $"Error saving: {ex.Message}");
             }
         }
 
@@ -392,61 +448,99 @@ namespace Linage.GUI
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
-        private void UpdateLineHistory()
+        private async Task UpdateLineHistory()
         {
             // Guard against null reference - grid may not be initialized
-            if (_lineHistoryGrid == null)
+            if (_lineHistoryGrid == null || _codeEditor.IsDisposed)
                 return;
-                
-            _lineHistoryGrid.Rows.Clear();
 
             if (_versionController == null || string.IsNullOrEmpty(_currentFilePath))
                 return;
 
             try
             {
+                // Must get values on UI thread before async
                 int currentLineIndex = _codeEditor.GetLineFromCharIndex(_codeEditor.SelectionStart);
                 int lineNumber = currentLineIndex + 1; // 1-based
+                string filePath = _currentFilePath;
+                
+                // Clear grid on UI thread
+                _lineHistoryGrid.Rows.Clear();
 
                 // Get the relative path for the file
-                string relativePath = _currentFilePath;
-                if (!string.IsNullOrEmpty(_repositoryRoot) && _currentFilePath.StartsWith(_repositoryRoot))
+                string relativePath = filePath;
+                if (!string.IsNullOrEmpty(_repositoryRoot) && filePath.StartsWith(_repositoryRoot))
                 {
-                    relativePath = _currentFilePath.Substring(_repositoryRoot.Length).TrimStart('\\', '/');
+                    relativePath = filePath.Substring(_repositoryRoot.Length).TrimStart('\\', '/');
                 }
 
-                // Get commit history and find which commits touched this file/line
-                var commits = _versionController.GraphService.GetCommitHistory();
+                // ASYNC CALL - Non-blocking
+                var lineBlame = await _versionController.GraphService.GetLineBlameAsync(relativePath, lineNumber);
+                
+                // Back on UI Context (await handles this in WinForms)
+                if (_lineHistoryGrid.IsDisposed) return;
 
-                foreach (var commit in commits.Take(10)) // Show last 10 relevant commits
+                if (lineBlame != null && lineBlame.CommitId.HasValue)
                 {
-                    // Check if this commit contains this file
-                    if (commit.Snapshot?.Files == null) continue;
-
-                    var fileInCommit = commit.Snapshot.Files
-                        .FirstOrDefault(f => f.FilePath.Equals(relativePath, StringComparison.OrdinalIgnoreCase) ||
-                                            f.FilePath.EndsWith(Path.GetFileName(_currentFilePath), StringComparison.OrdinalIgnoreCase));
-
-                    if (fileInCommit != null)
+                    // Found line-specific blame data
+                    var commit = _versionController.GraphService.GetCommitById(lineBlame.CommitId.Value);
+                    if (commit != null)
                     {
                         _lineHistoryGrid.Rows.Add(
-                            commit.CommitHash?.Substring(0, 7) ?? "N/A",
+                            commit.CommitHash?.Substring(0, Math.Min(7, commit.CommitHash?.Length ?? 0)) ?? "N/A",
                             commit.AuthorName ?? "Unknown",
                             commit.Timestamp.ToString("yyyy-MM-dd HH:mm")
                         );
+                    }
+                    else
+                    {
+                        // Commit not in cache, show change info
+                        _lineHistoryGrid.Rows.Add(
+                            lineBlame.CommitId?.ToString().Substring(0, 7) ?? "N/A",
+                            "Unknown",
+                            lineBlame.Timestamp.ToString("yyyy-MM-dd HH:mm")
+                        );
+                    }
+                }
+                else
+                {
+                    // Fallback: show commits that touched this file (file-level history)
+                    // We can also make this async if GetCommitHistory() is slow
+                    var commits = await Task.Run(() => _versionController.GraphService.GetCommitHistory());
+
+                    foreach (var commit in commits.Take(10))
+                    {
+                        if (commit.Snapshot?.Files == null) continue;
+
+                        var fileInCommit = commit.Snapshot.Files
+                            .FirstOrDefault(f => f.FilePath.Equals(relativePath, StringComparison.OrdinalIgnoreCase) ||
+                                                f.FilePath.EndsWith(Path.GetFileName(filePath), StringComparison.OrdinalIgnoreCase));
+
+                        if (fileInCommit != null)
+                        {
+                            _lineHistoryGrid.Rows.Add(
+                                commit.CommitHash?.Substring(0, Math.Min(7, commit.CommitHash?.Length ?? 0)) ?? "N/A",
+                                commit.AuthorName ?? "Unknown",
+                                commit.Timestamp.ToString("yyyy-MM-dd HH:mm")
+                            );
+                        }
                     }
                 }
 
                 // If no history found, show placeholder
                 if (_lineHistoryGrid.Rows.Count == 0)
                 {
-                    _lineHistoryGrid.Rows.Add("---", "Not tracked", "---");
+                    _lineHistoryGrid.Rows.Add("---", $"Line {lineNumber}: Not tracked", "---");
                 }
             }
             catch (Exception ex)
             {
-                _lineHistoryGrid.Rows.Clear();
-                _lineHistoryGrid.Rows.Add("Error", ex.Message, "---");
+                if (!_lineHistoryGrid.IsDisposed)
+                {
+                    _lineHistoryGrid.Rows.Clear();
+                    _lineHistoryGrid.Rows.Add("Error", "History Unavailable", "---");
+                }
+                Linage.Infrastructure.DebugLogger.Warn($"UpdateLineHistory Error: {ex.Message}");
             }
         }
 

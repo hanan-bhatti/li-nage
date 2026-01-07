@@ -29,6 +29,8 @@ namespace Linage.GUI.Notifications
 
             NotificationManager.Instance.NotificationAdded += OnNotificationAdded;
             NotificationManager.Instance.NotificationDismissed += OnNotificationDismissed;
+            
+            _mainForm.Resize += (s, e) => RepositionToasts();
         }
 
         private void OnNotificationAdded(object sender, NotificationItem item)

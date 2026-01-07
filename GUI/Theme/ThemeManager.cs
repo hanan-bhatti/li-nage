@@ -93,8 +93,7 @@ namespace Linage.GUI.Theme
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to save theme: {ex.Message}", 
-                    "Theme Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Linage.Infrastructure.Services.NotificationManager.Instance.ShowWarning("Theme Error", $"Failed to save theme: {ex.Message}");
             }
         }
 

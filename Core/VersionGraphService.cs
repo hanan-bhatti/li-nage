@@ -134,11 +134,39 @@ namespace Linage.Core
         public List<Commit> GetCommitHistory()
         {
             if (_currentBranch == null) return new List<Commit>();
-            
+
             if (_cachedHistoryList != null) return _cachedHistoryList;
-            
+
             _cachedHistoryList = _currentBranch.GetHistory();
             return _cachedHistoryList;
+        }
+
+        /// <summary>
+        /// Gets blame information for a specific line in a file.
+        /// Returns the LineChange with the CommitId of the commit that last modified this line.
+        /// </summary>
+        public async Task<LineChange> GetLineBlameAsync(string filePath, int lineNumber)
+        {
+            return await _metadataStore.GetLineBlameAsync(filePath, lineNumber);
+        }
+
+        /// <summary>
+        /// Gets blame information for all lines in a file.
+        /// Returns line changes with CommitIds for each modified line.
+        /// </summary>
+        public async Task<List<LineChange>> GetFileBlameAsync(string filePath)
+        {
+            return await _metadataStore.GetFileBlameAsync(filePath);
+        }
+
+        /// <summary>
+        /// Gets a commit by its ID.
+        /// </summary>
+        public Commit GetCommitById(Guid commitId)
+        {
+            if (_commitCache.TryGetValue(commitId, out var commit))
+                return commit;
+            return null;
         }
 
         public Commit FindCommonAncestor(Commit a, Commit b)

@@ -6,6 +6,7 @@ namespace Linage.Core.Notifications
         Success,
         Warning,
         Error,
-        Progress
+        Progress,
+        Question
     }
 }

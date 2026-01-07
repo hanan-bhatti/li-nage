@@ -64,6 +64,16 @@ namespace Linage.Infrastructure.Services
             Show(title, message, NotificationSeverity.Warning);
         }
 
+        public void ShowConfirmation(string title, string message, Action onYes, Action onNo = null)
+        {
+            var actions = new List<NotificationAction>
+            {
+                new NotificationAction("Yes", onYes, true),
+                new NotificationAction("No", onNo ?? (() => { }))
+            };
+            Show(title, message, NotificationSeverity.Question, actions);
+        }
+
         public void DismissToast(NotificationItem item)
         {
             if (_activeToasts.Contains(item))

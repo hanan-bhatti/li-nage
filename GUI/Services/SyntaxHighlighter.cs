@@ -42,39 +42,61 @@ namespace Linage.GUI.Services
         {
             return Task.Run(() => 
             {
-                var tokens = new List<StyleToken>();
-                
-                // Helper to add tokens
-                void AddMatches(string pattern, Color color)
+                try
                 {
-                    foreach (Match m in Regex.Matches(text, pattern, RegexOptions.Multiline))
+                    var tokens = new List<StyleToken>();
+                    
+                    // Skip highlighting for very large files to prevent freezing
+                    if (text.Length > 100000) // 100KB threshold
                     {
-                        tokens.Add(new StyleToken 
-                        { 
-                            StartIndex = globalOffset + m.Index, 
-                            Length = m.Length, 
-                            Color = color 
-                        });
+                        return tokens; // Return empty tokens for large files
                     }
+                    
+                    // Helper to add tokens
+                    void AddMatches(string pattern, Color color)
+                    {
+                        try
+                        {
+                            foreach (Match m in Regex.Matches(text, pattern, RegexOptions.Multiline))
+                            {
+                                tokens.Add(new StyleToken 
+                                { 
+                                    StartIndex = globalOffset + m.Index, 
+                                    Length = m.Length, 
+                                    Color = color 
+                                });
+                            }
+                        }
+                        catch (RegexMatchTimeoutException)
+                        {
+                            // Timeout on regex - skip this pattern
+                            System.Diagnostics.Debug.WriteLine($"Regex timeout on pattern: {pattern}");
+                        }
+                    }
+
+                    // Order matters (last one wins in naive painting, but here we might want to sort)
+                    // Actually, for RichTextBox sequential painting, last applied color overwrites.
+                    // So specific rules (comments/strings) should come last or we need to handle overlaps.
+                    
+                    // 1. Keywords
+                    AddMatches(PatternKeyword, ColKeyword);
+                    
+                    // 2. Types
+                    AddMatches(PatternType, ColType);
+
+                    // 3. Strings
+                    AddMatches(PatternString, ColString);
+                    
+                    // 4. Comments (Highest priority)
+                    AddMatches(PatternComment, ColComment);
+
+                    return tokens;
                 }
-
-                // Order matters (last one wins in naive painting, but here we might want to sort)
-                // Actually, for RichTextBox sequential painting, last applied color overwrites.
-                // So specific rules (comments/strings) should come last or we need to handle overlaps.
-                
-                // 1. Keywords
-                AddMatches(PatternKeyword, ColKeyword);
-                
-                // 2. Types
-                AddMatches(PatternType, ColType);
-
-                // 3. Strings
-                AddMatches(PatternString, ColString);
-                
-                // 4. Comments (Highest priority)
-                AddMatches(PatternComment, ColComment);
-
-                return tokens;
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"ParseAsync error: {ex.Message}");
+                    return new List<StyleToken>(); // Return empty on error
+                }
             });
         }
 
@@ -123,9 +145,28 @@ namespace Linage.GUI.Services
 
         public async Task HighlightAllAsync()
         {
-            string text = _rtb.Text;
-            var tokens = await ParseAsync(text, 0);
-            ApplyTokens(tokens, 0, text.Length);
+            try
+            {
+                string text = _rtb.Text;
+                
+                // Parse tokens asynchronously
+                var tokens = await ParseAsync(text, 0).ConfigureAwait(true);
+                
+                // Apply tokens on UI thread
+                if (_rtb.InvokeRequired)
+                {
+                    _rtb.Invoke(new Action(() => ApplyTokens(tokens, 0, text.Length)));
+                }
+                else
+                {
+                    ApplyTokens(tokens, 0, text.Length);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Silently fail on syntax highlighting to avoid blocking file loading
+                System.Diagnostics.Debug.WriteLine($"Syntax highlighting failed: {ex.Message}");
+            }
         }
 
         // Synchronous fallback for single line

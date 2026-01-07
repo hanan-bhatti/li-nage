@@ -81,6 +81,10 @@ namespace Linage.GUI.Notifications
                 MaximumSize = new Size(contentWidth, 0)
             };
             this.Controls.Add(lblMessage);
+            
+            // Force layout to get accurate height
+            var preferredSize = lblMessage.GetPreferredSize(new Size(contentWidth, 0));
+            lblMessage.Size = preferredSize;
 
             // Close Button
             var btnClose = new Label
@@ -197,6 +201,7 @@ namespace Linage.GUI.Notifications
                 case NotificationSeverity.Warning: return "\uE7BA"; // Warning
                 case NotificationSeverity.Error: return "\uEA39";   // Error
                 case NotificationSeverity.Progress: return "\uE768"; // Sync/Rotate
+                case NotificationSeverity.Question: return "\uE9CE"; // Question Info
                 default: return "\uE946"; // Info
             }
         }
@@ -208,6 +213,7 @@ namespace Linage.GUI.Notifications
                 case NotificationSeverity.Success: return ModernTheme.SuccessColor;
                 case NotificationSeverity.Warning: return ModernTheme.WarningColor;
                 case NotificationSeverity.Error: return ModernTheme.ErrorColor;
+                case NotificationSeverity.Question: return ModernTheme.PrimaryColor;
                 default: return ModernTheme.PrimaryColor; // Info Blue
             }
         }

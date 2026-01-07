@@ -54,7 +54,7 @@ namespace Linage.GUI.Helpers
 
                 var finalMessage = successMessage ?? $"{operationName} completed successfully";
                 _updateStatus(finalMessage);
-                MessageBox.Show(finalMessage, operationName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Linage.Infrastructure.Services.NotificationManager.Instance.ShowSuccess(operationName, finalMessage);
             }
             catch (Exception ex)
             {

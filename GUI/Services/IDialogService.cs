@@ -22,16 +22,18 @@ namespace Linage.GUI.Services
         /// </summary>
         /// <param name="title">Dialog title</param>
         /// <param name="message">Dialog message</param>
-        /// <returns>DialogResult indicating user choice</returns>
-        DialogResult PromptYesNoCancel(string title, string message);
+        /// <param name="onYes">Action to run on Yes</param>
+        /// <param name="onNo">Action to run on No</param>
+        void PromptYesNoCancel(string title, string message, Action onYes, Action onNo = null);
 
         /// <summary>
         /// Shows a Yes/No dialog.
         /// </summary>
         /// <param name="title">Dialog title</param>
         /// <param name="message">Dialog message</param>
-        /// <returns>DialogResult indicating user choice</returns>
-        DialogResult PromptYesNo(string title, string message);
+        /// <param name="onYes">Action to run on Yes</param>
+        /// <param name="onNo">Action to run on No</param>
+        void PromptYesNo(string title, string message, Action onYes, Action onNo = null);
 
         /// <summary>
         /// Prompts the user to select a folder.
@@ -60,10 +62,17 @@ namespace Linage.GUI.Services
         /// <param name="title">Dialog title</param>
         /// <param name="message">Warning message</param>
         void ShowWarning(string title, string message);
+
+        /// <summary>
+        /// Shows a success message.
+        /// </summary>
+        /// <param name="title">Dialog title</param>
+        /// <param name="message">Success message</param>
+        void ShowSuccess(string title, string message);
     }
 
     /// <summary>
-    /// Production implementation of IDialogService using WinForms dialogs.
+    /// Production implementation of IDialogService using NotificationManager.
     /// </summary>
     public class DialogService : IDialogService
     {
@@ -72,14 +81,18 @@ namespace Linage.GUI.Services
             return Microsoft.VisualBasic.Interaction.InputBox(prompt, title, defaultValue);
         }
 
-        public DialogResult PromptYesNoCancel(string title, string message)
+        public void PromptYesNoCancel(string title, string message, Action onYes, Action onNo = null)
         {
-            return MessageBox.Show(message, title, MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+             // For now mapping YesNoCancel to simple Confirmation (Yes/No)
+             // or could use custom actions for Cancel?
+             // Since NotificationManager.ShowConfirmation supports Yes/No, we'll map to that.
+             // If strict 3-way is needed, we'd need a ShowYesNoCancel in Manager.
+             Linage.Infrastructure.Services.NotificationManager.Instance.ShowConfirmation(title, message, onYes, onNo);
         }
 
-        public DialogResult PromptYesNo(string title, string message)
+        public void PromptYesNo(string title, string message, Action onYes, Action onNo = null)
         {
-            return MessageBox.Show(message, title, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            Linage.Infrastructure.Services.NotificationManager.Instance.ShowConfirmation(title, message, onYes, onNo);
         }
 
         public string PromptForFolder(string title)
@@ -103,6 +116,11 @@ namespace Linage.GUI.Services
         public void ShowWarning(string title, string message)
         {
             Linage.Infrastructure.Services.NotificationManager.Instance.ShowWarning(title, message);
+        }
+
+        public void ShowSuccess(string title, string message)
+        {
+            Linage.Infrastructure.Services.NotificationManager.Instance.ShowSuccess(title, message);
         }
     }
 }

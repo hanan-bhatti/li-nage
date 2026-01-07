@@ -35,7 +35,6 @@ namespace Linage.GUI
             this.AutoScroll = true; 
             this.DoubleBuffered = true;
             this.ResizeRedraw = true;
-            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "GitGraphView.cs");
         }
 
         private void InitializeComponent()

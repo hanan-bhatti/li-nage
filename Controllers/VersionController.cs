@@ -241,6 +241,10 @@ namespace Linage.Controllers
             await GraphService.AddCommitAsync(commit);
             DebugLogger.Info($"  -> Commit added to graph");
 
+            // Generate and save line-level changes for blame tracking
+            await GenerateAndSaveLineChangesAsync(commit, parent, selectedFiles);
+            DebugLogger.Info($"  -> Line changes tracked");
+
             // Rescan for changes after commit to clear committed files from dirty list
             if (ChangeDetector != null && !string.IsNullOrEmpty(_currentRootPath))
             {
@@ -279,6 +283,80 @@ namespace Linage.Controllers
 
             Status = $"Committed: {message}";
             DebugLogger.Info($"  -> Commit complete");
+        }
+
+        /// <summary>
+        /// Generates line-level changes for blame tracking and saves them to the database.
+        /// </summary>
+        private async Task GenerateAndSaveLineChangesAsync(Commit commit, Commit parent, List<string> selectedFiles)
+        {
+            var lineTracker = new LineTracker();
+            var allLineChanges = new List<LineChange>();
+
+            foreach (var filePath in selectedFiles)
+            {
+                try
+                {
+                    // Get the full path
+                    var fullPath = filePath;
+                    if (!Path.IsPathRooted(filePath) && !string.IsNullOrEmpty(_currentRootPath))
+                    {
+                        fullPath = Path.Combine(_currentRootPath, filePath.Replace('/', Path.DirectorySeparatorChar));
+                    }
+
+                    // Get relative path for storage
+                    var relativePath = filePath;
+                    if (Path.IsPathRooted(filePath) && !string.IsNullOrEmpty(_currentRootPath) &&
+                        filePath.StartsWith(_currentRootPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        relativePath = filePath.Substring(_currentRootPath.Length)
+                            .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    }
+                    relativePath = relativePath.Replace('\\', '/');
+
+                    // Get old content from parent commit's blob
+                    string oldContent = "";
+                    if (parent?.Snapshot?.Files != null)
+                    {
+                        var parentFile = parent.Snapshot.Files
+                            .FirstOrDefault(f => f.FilePath.Equals(relativePath, StringComparison.OrdinalIgnoreCase));
+                        if (parentFile != null && !string.IsNullOrEmpty(parentFile.FileHash))
+                        {
+                            oldContent = _fileService.GetContentByHash(parentFile.FileHash) ?? "";
+                        }
+                    }
+
+                    // Get new content from current file
+                    string newContent = "";
+                    if (File.Exists(fullPath))
+                    {
+                        newContent = File.ReadAllText(fullPath);
+                    }
+
+                    // Generate line changes
+                    var changes = lineTracker.GenerateLineChanges(oldContent, newContent);
+
+                    // Set commit and file info on each change
+                    foreach (var change in changes)
+                    {
+                        change.CommitId = commit.CommitId;
+                        change.FilePath = relativePath;
+                    }
+
+                    allLineChanges.AddRange(changes);
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.Error($"Failed to generate line changes for {filePath}: {ex.Message}");
+                }
+            }
+
+            // Save all line changes
+            if (allLineChanges.Count > 0)
+            {
+                await _metadataStore.SaveLineChangesAsync(allLineChanges);
+                DebugLogger.Trace($"  -> Saved {allLineChanges.Count} line changes");
+            }
         }
 
         // --- Remote Operations ---

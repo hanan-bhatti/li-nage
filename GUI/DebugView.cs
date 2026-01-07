@@ -31,7 +31,6 @@ namespace Linage.GUI
             InitializeComponent();
             SetupTimer();
             SubscribeToDebugLogger();
-            Linage.GUI.Helpers.WatermarkHelper.AddWatermarkLabel(this, "DebugView.cs");
         }
 
         private void SubscribeToDebugLogger()

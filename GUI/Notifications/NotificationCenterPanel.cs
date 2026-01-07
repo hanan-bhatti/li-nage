@@ -133,6 +133,7 @@ namespace Linage.GUI.Notifications
             {
                 Width = this.Width - 25, // Scrollbar margin
                 AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 Padding = new Padding(5),
                 Margin = new Padding(0, 0, 0, 1) // Separator logic via margin? Or draw line
             };
@@ -157,6 +158,9 @@ namespace Linage.GUI.Notifications
                 AutoSize = true,
                 MaximumSize = new Size(panel.Width - 60, 0)
             };
+            
+            // Force measurement
+            lblText.Size = lblText.GetPreferredSize(new Size(lblText.MaximumSize.Width, 0));
             
             // Delete specific item (X)
              var btnDelete = new Label
