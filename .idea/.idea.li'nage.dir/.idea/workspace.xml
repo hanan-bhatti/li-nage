@@ -7,26 +7,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="32c24d99-153a-4c9b-83ae-d754e5bf46c9" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.li'nage.dir/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.li'nage.dir/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Controllers/VersionController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/VersionController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/Branch.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Branch.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/Remote.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Remote.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/RemoteService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/RemoteService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/VersionGraphService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/VersionGraphService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/Controls/ModernControls.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Controls/ModernControls.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/FileExplorerView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/FileExplorerView.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/MainWindow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/MainWindow.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/NotificationService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/NotificationService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/Notifications/ToastNotification.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Notifications/ToastNotification.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/Services/IDialogService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Services/IDialogService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/TerminalView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/TerminalView.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/Theme/ModernTheme.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Theme/ModernTheme.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/Theme/ThemeEditorDialog.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Theme/ThemeEditorDialog.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/WelcomeView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/WelcomeView.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Infrastructure/LiNageDbContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Infrastructure/LiNageDbContext.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Infrastructure/MetadataStore.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Infrastructure/MetadataStore.cs" afterDir="false" />
-    </list>
+    <list default="true" id="32c24d99-153a-4c9b-83ae-d754e5bf46c9" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -146,7 +127,7 @@
       <workItem from="1767756756968" duration="5397000" />
       <workItem from="1767765759536" duration="2189000" />
       <workItem from="1767772529124" duration="1099000" />
-      <workItem from="1767773958047" duration="702000" />
+      <workItem from="1767773958047" duration="1026000" />
     </task>
     <servers />
   </component>
