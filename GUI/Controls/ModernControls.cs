@@ -536,7 +536,14 @@ namespace Linage.GUI.Controls
             var g = e.Graphics;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
             Color iconColor = _active ? Color.White : (_hover ? ModernTheme.TextPrimary : ModernTheme.TextSecondary);
-            if (_active) using (var brush = new SolidBrush(Color.White)) g.FillRectangle(brush, 0, 10, 2, Height - 20);
+            
+            // Active Indicator (Thicker and Primary Color)
+            if (_active) 
+            {
+                using (var brush = new SolidBrush(ModernTheme.PrimaryColor)) 
+                    g.FillRectangle(brush, 0, 8, 3, Height - 16); // 3px wide, vertically centered padding
+            }
+            
             using (var brush = new SolidBrush(iconColor))
             using (var font = new Font("Segoe MDL2 Assets", 16f))
             {
@@ -591,24 +598,22 @@ namespace Linage.GUI.Controls
     {
         public PremiumMenuRenderer() : base(new PremiumColorTable())
         {
-            this.RoundedEdges = true;
+            this.RoundedEdges = false; // Square, crisp edges
         }
 
         protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
         {
-            if (!e.Item.Selected)
-            {
-                base.OnRenderMenuItemBackground(e);
-                return;
-            }
+            if (!e.Item.Selected) return;
 
-            // Custom selection background (Subtle gradient or solid)
             var rect = new Rectangle(Point.Empty, e.Item.Size);
-            using (var brush = new SolidBrush(ModernTheme.SurfaceLight)) // Lighter background for hover
+            
+            // 1. Flat Hover Background
+            using (var brush = new SolidBrush(ModernTheme.SurfaceLight))
             {
                 e.Graphics.FillRectangle(brush, rect);
             }
-            // Vertical accent line on left
+            
+            // 2. Active Indicator (Left Bar) - Minimal 3px
             using (var brush = new SolidBrush(ModernTheme.PrimaryColor))
             {
                 e.Graphics.FillRectangle(brush, 0, 0, 3, rect.Height); 
@@ -617,163 +622,61 @@ namespace Linage.GUI.Controls
 
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
-            e.TextColor = e.Item.Selected ? Color.White : ModernTheme.TextPrimary;
+            e.TextColor = e.Item.Selected ? ModernTheme.TextPrimary : ModernTheme.TextSecondary;
             base.OnRenderItemText(e);
         }
 
         protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
         {
-            // Clean single border
+            // Minimal single pixel border
             using (var pen = new Pen(ModernTheme.BorderColor))
             {
                 e.Graphics.DrawRectangle(pen, new Rectangle(0, 0, e.ToolStrip.Width - 1, e.ToolStrip.Height - 1));
             }
         }
         
-        // Remove the grip and other noise if needed
-    }
-
-    /// <summary>
-    /// VS Code-style menu renderer for clean, minimal appearance
-    /// </summary>
-    public class VSCodeMenuRenderer : ToolStripProfessionalRenderer
-    {
-        public VSCodeMenuRenderer() : base(new VSCodeColorTable())
+        protected override void OnRenderImageMargin(ToolStripRenderEventArgs e)
         {
-            this.RoundedEdges = false;
-        }
-
-        protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
-        {
-            if (!e.Item.Selected && !e.Item.Pressed)
+            // Do NOT draw the default gradient margin. 
+            // Just fill with background color to look like a flat list.
+            using (var brush = new SolidBrush(ModernTheme.SurfaceColor))
             {
-                return; // No background for unselected items
-            }
-
-            var rect = new Rectangle(Point.Empty, e.Item.Size);
-            
-            // Fill with subtle hover color
-            using (var brush = new SolidBrush(e.Item.Pressed ? ModernTheme.TabHover : ModernTheme.SurfaceLight))
-            {
-                e.Graphics.FillRectangle(brush, rect);
+                e.Graphics.FillRectangle(brush, e.AffectedBounds); 
             }
         }
-
-        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
-        {
-            e.TextColor = ModernTheme.TextPrimary;
-            e.TextFont = ModernTheme.FontBody;
-            base.OnRenderItemText(e);
-        }
-
-        protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
-        {
-            // Draw a thin horizontal line
-            var rect = new Rectangle(30, 3, e.Item.Width - 30, 1);
-            using (var brush = new SolidBrush(ModernTheme.BorderColor))
-            {
-                e.Graphics.FillRectangle(brush, rect);
-            }
-        }
-
-        protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
-        {
-            // Only draw border for dropdown menus, not menu strip
-            if (e.ToolStrip is MenuStrip)
-            {
-                return; // No border on top menu
-            }
-
-            using (var pen = new Pen(ModernTheme.BorderColor))
-            {
-                var rect = new Rectangle(0, 0, e.ToolStrip.Width - 1, e.ToolStrip.Height - 1);
-                e.Graphics.DrawRectangle(pen, rect);
-            }
-        }
-
-        protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
-        {
-            e.ArrowColor = ModernTheme.TextSecondary;
-            base.OnRenderArrow(e);
-        }
-
-        protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
-        {
-            // Custom checkmark rendering
-            var rect = new Rectangle(2, 2, 16, 16);
-            using (var brush = new SolidBrush(ModernTheme.PrimaryColor))
-            {
-                e.Graphics.FillRectangle(brush, rect);
-            }
-            
-            // Draw checkmark
-            using (var pen = new Pen(Color.White, 2))
-            {
-                e.Graphics.DrawLines(pen, new[] 
-                { 
-                    new Point(5, 10), 
-                    new Point(8, 13), 
-                    new Point(15, 6) 
-                });
-            }
-        }
-    }
-
-    public class VSCodeColorTable : ProfessionalColorTable
-    {
-        // Menu strip (top bar)
-        public override Color MenuStripGradientBegin => ModernTheme.SurfaceColor;
-        public override Color MenuStripGradientEnd => ModernTheme.SurfaceColor;
-        
-        // Dropdown background
-        public override Color ToolStripDropDownBackground => ModernTheme.SurfaceColor;
-        public override Color ImageMarginGradientBegin => ModernTheme.SurfaceColor;
-        public override Color ImageMarginGradientMiddle => ModernTheme.SurfaceColor;
-        public override Color ImageMarginGradientEnd => ModernTheme.SurfaceColor;
-        
-        // Borders
-        public override Color MenuBorder => ModernTheme.BorderColor;
-        public override Color MenuItemBorder => Color.Transparent;
-        
-        // Selection
-        public override Color MenuItemSelected => ModernTheme.SurfaceLight;
-        public override Color MenuItemSelectedGradientBegin => ModernTheme.SurfaceLight;
-        public override Color MenuItemSelectedGradientEnd => ModernTheme.SurfaceLight;
-        public override Color MenuItemPressedGradientBegin => ModernTheme.TabHover;
-        public override Color MenuItemPressedGradientMiddle => ModernTheme.TabHover;
-        public override Color MenuItemPressedGradientEnd => ModernTheme.TabHover;
-        
-        // Checked items
-        public override Color CheckBackground => ModernTheme.PrimaryColor;
-        public override Color CheckSelectedBackground => ModernTheme.PrimaryDark;
-        public override Color CheckPressedBackground => ModernTheme.PrimaryDark;
-        
-        // Separator
-        public override Color SeparatorDark => ModernTheme.BorderColor;
-        public override Color SeparatorLight => ModernTheme.BorderColor;
     }
 
     public class PremiumColorTable : ProfessionalColorTable
     {
-        // Backgrounds
+        // 1. Backgrounds - All Flat
         public override Color ToolStripDropDownBackground => ModernTheme.SurfaceColor;
-        public override Color MenuStripGradientBegin => ModernTheme.BackColor;
-        public override Color MenuStripGradientEnd => ModernTheme.BackColor;
+        public override Color MenuStripGradientBegin => ModernTheme.SurfaceColor;
+        public override Color MenuStripGradientEnd => ModernTheme.SurfaceColor;
         
-        // Borders
-        public override Color MenuBorder => ModernTheme.BorderColor;
-        public override Color MenuItemBorder => Color.Transparent; // No internal borders on hover
-
-        // Hover / Selection
-        public override Color MenuItemSelected => ModernTheme.SurfaceLight;
-        public override Color MenuItemSelectedGradientBegin => ModernTheme.SurfaceLight;
-        public override Color MenuItemSelectedGradientEnd => ModernTheme.SurfaceLight;
-        
-        public override Color MenuItemPressedGradientBegin => ModernTheme.SurfaceColor;
-        public override Color MenuItemPressedGradientEnd => ModernTheme.SurfaceColor;
-        
+        // 2. Image Margin (The Left Strip) - All Flat (Matches Background)
         public override Color ImageMarginGradientBegin => ModernTheme.SurfaceColor;
         public override Color ImageMarginGradientMiddle => ModernTheme.SurfaceColor;
         public override Color ImageMarginGradientEnd => ModernTheme.SurfaceColor;
+        
+        // 3. Borders - None/Transparent within the menu
+        public override Color MenuBorder => ModernTheme.BorderColor;
+        public override Color MenuItemBorder => Color.Transparent;
+        
+        // 4. Hover / Selection - handled in Renderer for custom look, but defaults here to be safe
+        public override Color MenuItemSelected => ModernTheme.SurfaceLight;
+        public override Color MenuItemSelectedGradientBegin => ModernTheme.SurfaceLight;
+        public override Color MenuItemSelectedGradientEnd => ModernTheme.SurfaceLight;
+        public override Color MenuItemPressedGradientBegin => ModernTheme.SurfaceLight;
+        public override Color MenuItemPressedGradientEnd => ModernTheme.SurfaceLight;
+        
+        // 5. Separators
+        public override Color SeparatorDark => ModernTheme.BorderColor;
+        public override Color SeparatorLight => ModernTheme.BorderColor;
+        
+        // 6. Checkboxes
+        public override Color CheckBackground => ModernTheme.SurfaceLight;
+        public override Color CheckSelectedBackground => ModernTheme.SurfaceLight;
+        public override Color CheckPressedBackground => ModernTheme.SurfaceLight;
+        public override Color ButtonSelectedHighlight => Color.Transparent; // No highlight borders
     }
 }

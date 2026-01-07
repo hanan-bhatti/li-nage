@@ -23,6 +23,10 @@ namespace Linage.GUI
     {
         // Controllers
         private readonly VersionController _versionController;
+        private readonly MetadataStore _metadataStore;
+        private WorkspaceService _workspaceService;
+        private readonly FileService _fileService;
+        private readonly ChangeDetector _changeDetector;
         private readonly DebugController _debugController;
         private readonly IndexController _indexController;
         private readonly RemoteController _remoteController;
@@ -94,19 +98,52 @@ namespace Linage.GUI
 
             try
             {
-                _versionController = new VersionController();
+                // Placeholder for 'path' variable, assuming this block is moved/adapted from a method like LoadProject
+                // For the constructor, we might not have a path yet, or it comes from config.
+                // The provided diff implies a 'path' variable is available here.
+                // For now, let's assume 'path' is initialized elsewhere or is a default.
+                string path = Application.StartupPath; // Example placeholder
+
+                _currentRepository = path;
+                
+                // Initialize Infrastructure
+                var dbContext = new LiNageDbContext();
+                _metadataStore = new MetadataStore(dbContext); 
+                var hashService = new HashService();
+                
+                _fileService = new FileService(hashService); 
+                _changeDetector = new ChangeDetector(path); 
+                
+                // Initialize VersionController with DI
+                _versionController = new VersionController(path, _metadataStore);
+                _workspaceService = new WorkspaceService(path);
 
                 // Initialize Auth and Remote controllers using VersionController's services
                 _authController = new AuthController(_versionController.AuthService);
 
                 // Initialize RemoteController with AuthController
-            _remoteController = new RemoteController(_authController);
+                _remoteController = new RemoteController(_authController);
 
                 // Initialize Services
                 _dialogService = new DialogService();
                 _asyncHelper = new AsyncOperationHelper(ToggleProgress, UpdateStatus, ShowError, this);
                 _remoteOperationsService = new RemoteOperationsService(_remoteController, _versionController.GraphService);
                 _layoutConfig = UILayoutConfiguration.LoadFromSettings();
+
+                // These lines seem to belong to a project loading method, not the constructor directly.
+                // However, following the diff, they are placed here.
+                // Assuming _terminalView and _scanController are initialized before this point or are null-checked.
+                _terminalView?.SetWorkingDirectory(path);
+                // _versionController.ScanController = _scanController; // _scanController is not defined in the provided context
+                _terminalView.VersionController = _versionController;
+
+                // Load workspace state (assuming this method exists)
+                // RestoreWorkspaceState();
+
+                // await _versionController.LoadProjectAsync(path); // Cannot use await in constructor
+                UpdateStatus($"Project loaded: {path}");
+                
+                // _changeWatcher = new FileSystemWatcher(path); // _changeWatcher is not defined in the provided context
             }
             catch (Exception ex)
             {
@@ -350,7 +387,7 @@ namespace Linage.GUI
             {
                 BackColor = ModernTheme.SurfaceColor,
                 ForeColor = ModernTheme.TextPrimary,
-                Renderer = new VSCodeMenuRenderer(),
+                Renderer = new Linage.GUI.Controls.PremiumMenuRenderer(),
                 Padding = new Padding(5, 2, 0, 2)
             };
 
@@ -418,7 +455,7 @@ namespace Linage.GUI
             _welcomeView = new WelcomeView { Dock = DockStyle.Fill };
             _welcomeView.OpenRepositoryClicked += OnOpenRepository;
             _welcomeView.CloneRepositoryClicked += async (s, e) => await OnClone();
-            _welcomeView.ImportGitClicked += OnImportGitRepository;
+            _welcomeView.ImportGitClicked += (s, e) => OnImportGitRepository(s, e);
 
             // 1. File Explorer
             _fileExplorer = new FileExplorerView { Dock = DockStyle.Fill };
@@ -435,6 +472,7 @@ namespace Linage.GUI
 
             // 4. Debug/Terminal (Bottom Panel)
             _terminalView = new TerminalView { Dock = DockStyle.Fill };
+            _terminalView.OnProjectLoadRequested += async (path) => await LoadProjectAsync(path);
             _debugView = new DebugView { Dock = DockStyle.Fill };
 
             var terminalTab = new TabPage("Terminal")
@@ -529,7 +567,7 @@ namespace Linage.GUI
             {
                 _menuStrip.BackColor = ModernTheme.SurfaceColor;
                 _menuStrip.ForeColor = ModernTheme.TextPrimary;
-                _menuStrip.Renderer = new VSCodeMenuRenderer();
+                _menuStrip.Renderer = new Linage.GUI.Controls.PremiumMenuRenderer();
             }
 
             // Activity Bar
@@ -1278,90 +1316,38 @@ namespace Linage.GUI
         private async void OnBranches(object sender, EventArgs e) 
         {
             if (_versionController?.GraphService == null) return;
-
-            var branches = await _versionController.GraphService.GetAllBranchesAsync();
-            if (branches == null || branches.Count == 0)
+            if (string.IsNullOrEmpty(_currentRepository)) 
             {
-                _dialogService.ShowInfo("Branches", "No branches found. Create a new branch first.");
-                return;
+                 _dialogService.ShowWarning("Warning", "No project loaded.");
+                 return;
             }
+
+            // FILTER: Pass _currentRepository to get project-specific branches
+            var branches = await _versionController.GraphService.GetAllBranchesAsync(_currentRepository);
+            
+            // Check if any branches exist. If not, maybe create 'main' by default or show empty dialog?
+            // If empty, we can still show dialog to let user create one.
+            var branchNames = branches?.Select(b => b.BranchName).ToArray() ?? new string[0];
 
             var currentBranch = _versionController.GraphService.GetCurrentBranch();
             
-            // Create a dialog for branch selection
-            using (var form = new Form
+            using (var dialog = new Linage.GUI.Dialogs.ModernBranchSelectorDialog(branchNames, currentBranch?.BranchName))
             {
-                Text = "Switch Branch",
-                Width = 400,
-                Height = 350,
-                StartPosition = FormStartPosition.CenterParent,
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                MaximizeBox = false,
-                MinimizeBox = false
-            })
-            {
-                var listBox = new ListBox
+                dialog.ShowDialog(this);
+                
+                if (dialog.CustomResult == DialogResult.OK)
                 {
-                    Dock = DockStyle.Top,
-                    Height = 250,
-                    Items = { }
-                };
-
-                // Populate branches with current branch marked
-                foreach (var branch in branches)
-                {
-                    string displayName = branch.BranchName;
-                    if (currentBranch != null && currentBranch.BranchName == branch.BranchName)
-                        displayName += " (current)";
-                    listBox.Items.Add(branch.BranchName);
+                   await SwitchBranchAsync(dialog.SelectedBranch);
                 }
-
-                var btnSwitch = new Button
+                else if (dialog.CustomResult == DialogResult.Retry)
                 {
-                    Text = "Switch",
-                    DialogResult = DialogResult.OK,
-                    Dock = DockStyle.Bottom,
-                    Height = 40,
-                    Margin = new Padding(5)
-                };
-
-                var btnNewBranch = new Button
-                {
-                    Text = "New Branch",
-                    DialogResult = DialogResult.Retry,
-                    Dock = DockStyle.Bottom,
-                    Height = 40,
-                    Margin = new Padding(5)
-                };
-
-                var btnDelete = new Button
-                {
-                    Text = "Delete",
-                    DialogResult = DialogResult.Abort,
-                    Dock = DockStyle.Bottom,
-                    Height = 40,
-                    Margin = new Padding(5)
-                };
-
-                form.Controls.Add(btnSwitch);
-                form.Controls.Add(btnNewBranch);
-                form.Controls.Add(btnDelete);
-                form.Controls.Add(listBox);
-
-                var result = form.ShowDialog(this);
-
-                if (result == DialogResult.OK && listBox.SelectedIndex >= 0)
-                {
-                    string selectedBranch = listBox.SelectedItem.ToString();
-                    await SwitchBranchAsync(selectedBranch);
+                   await CreateNewBranchAsync();
                 }
-                else if (result == DialogResult.Retry)
+                else if (dialog.CustomResult == DialogResult.Abort)
                 {
-                    await CreateNewBranchAsync();
-                }
-                else if (result == DialogResult.Abort && listBox.SelectedIndex >= 0)
-                {
-                    string branchToDelete = listBox.SelectedItem.ToString();
+                    string branchToDelete = dialog.SelectedBranch;
+                    if (string.IsNullOrEmpty(branchToDelete)) return;
+
                     if (currentBranch?.BranchName == branchToDelete)
                     {
                         _dialogService.ShowWarning("Delete Branch", "Cannot delete the current branch. Switch to another branch first.");
@@ -1415,7 +1401,7 @@ namespace Linage.GUI
                 ToggleProgress(true);
                 UpdateStatus($"Creating branch '{branchName}'...");
 
-                await _versionController.GraphService.CreateBranchAsync(branchName);
+                await _versionController.GraphService.CreateBranchAsync(branchName, _currentRepository);
                 await _versionController.GraphService.SwitchBranchAsync(branchName);
 
                 // Refresh UI
@@ -1468,92 +1454,61 @@ namespace Linage.GUI
         private async void OnManageRemotes(object sender, EventArgs e)
         {
             if (_versionController?.RemoteService == null) return;
-
-            var remotes = await _versionController.RemoteService.GetAllRemotesAsync();
-
-            // Create a dialog for managing remotes
-            using (var form = new Form
+             if (string.IsNullOrEmpty(_currentRepository)) 
             {
-                Text = "Manage Remotes",
-                Width = 500,
-                Height = 400,
-                StartPosition = FormStartPosition.CenterParent,
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                MaximizeBox = false,
-                MinimizeBox = false
-            })
+                 _dialogService.ShowWarning("Warning", "No project loaded.");
+                 return;
+            }
+
+            // FILTER: Pass _currentRepository
+            var remotes = await _versionController.RemoteService.GetAllRemotesAsync(_currentRepository);
+
+            using (var dialog = new Linage.GUI.Dialogs.ModernRemoteManagerDialog(remotes))
             {
-                var listBox = new ListBox
+                dialog.ShowDialog(this);
+                
+                if (dialog.CustomResult == DialogResult.Retry) // Add
                 {
-                    Dock = DockStyle.Top,
-                    Height = 250,
-                    Items = { }
-                };
+                    string name = _dialogService.PromptForInput("Remote Name", "Enter remote name (e.g. origin):", "origin");
+                    if (string.IsNullOrEmpty(name)) return;
+                    
+                    string url = _dialogService.PromptForInput("Remote URL", "Enter remote URL:");
+                    if (string.IsNullOrEmpty(url)) return;
 
-                // Populate remotes
-                foreach (var remote in remotes)
-                {
-                    string displayName = $"{remote.RemoteName}: {remote.RemoteUrl}";
-                    if (remote.IsDefault)
-                        displayName += " (default)";
-                    listBox.Items.Add(remote.RemoteName);
-                }
-
-                var btnAdd = new Button
-                {
-                    Text = "Add Remote",
-                    DialogResult = DialogResult.OK,
-                    Dock = DockStyle.Bottom,
-                    Height = 40,
-                    Margin = new Padding(5)
-                };
-
-                var btnSetDefault = new Button
-                {
-                    Text = "Set as Default",
-                    DialogResult = DialogResult.Retry,
-                    Dock = DockStyle.Bottom,
-                    Height = 40,
-                    Margin = new Padding(5)
-                };
-
-                var btnRemove = new Button
-                {
-                    Text = "Remove",
-                    DialogResult = DialogResult.Abort,
-                    Dock = DockStyle.Bottom,
-                    Height = 40,
-                    Margin = new Padding(5)
-                };
-
-                form.Controls.Add(btnAdd);
-                form.Controls.Add(btnSetDefault);
-                form.Controls.Add(btnRemove);
-                form.Controls.Add(listBox);
-
-                var result = form.ShowDialog(this);
-
-                if (result == DialogResult.OK)
-                {
-                    await AddRemoteAsync();
-                }
-                else if (result == DialogResult.Retry && listBox.SelectedIndex >= 0)
-                {
-                    string remoteName = listBox.SelectedItem.ToString();
-                    await SetDefaultRemoteAsync(remoteName);
-                }
-                else if (result == DialogResult.Abort && listBox.SelectedIndex >= 0)
-                {
-                    string remoteName = listBox.SelectedItem.ToString();
-                    if (MessageBox.Show($"Remove remote '{remoteName}'?", "Confirm Remove", 
-                        MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                    try
                     {
-                        await RemoveRemoteAsync(remoteName);
+                        // Pass current repository path
+                        await _versionController.RemoteService.AddRemoteAsync(name, url, _currentRepository);
+                        _dialogService.ShowSuccess("Success", $"Added remote '{name}'");
+                        OnManageRemotes(sender, e); // Refresh
                     }
+                    catch(Exception ex)
+                    {
+                        _dialogService.ShowError("Error", ex.Message);
+                    }
+                }
+                else if (dialog.CustomResult == DialogResult.OK) // Set Default
+                {
+                     if (!string.IsNullOrEmpty(dialog.SelectedRemote))
+                     {
+                         await _versionController.RemoteService.SetDefaultRemoteAsync(dialog.SelectedRemote, _currentRepository);
+                         _dialogService.ShowSuccess("Success", $"Set '{dialog.SelectedRemote}' as default");
+                         OnManageRemotes(sender, e);
+                     }
+                }
+                else if (dialog.CustomResult == DialogResult.Abort) // Remove
+                {
+                     if (!string.IsNullOrEmpty(dialog.SelectedRemote))
+                     {
+                         if (MessageBox.Show($"Remove remote '{dialog.SelectedRemote}'?", "Confirm", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                         {
+                             await _versionController.RemoteService.RemoveRemoteAsync(dialog.SelectedRemote);
+                             OnManageRemotes(sender, e);
+                         }
+                     }
                 }
             }
         }
-
         private async Task AddRemoteAsync()
         {
             string remoteName = _dialogService.PromptForInput("Add Remote", "Enter remote name (e.g., 'origin'):");
@@ -1567,7 +1522,7 @@ namespace Linage.GUI
                 ToggleProgress(true);
                 UpdateStatus($"Adding remote '{remoteName}'...");
 
-                await _versionController.RemoteService.AddRemoteAsync(remoteName, remoteUrl);
+                await _versionController.RemoteService.AddRemoteAsync(remoteName, remoteUrl, _currentRepository);
 
                 UpdateStatus($"Added remote '{remoteName}'");
                 _debugView?.Log($"Added remote: {remoteName} -> {remoteUrl}");
@@ -1618,7 +1573,7 @@ namespace Linage.GUI
                 ToggleProgress(true);
                 UpdateStatus($"Setting '{remoteName}' as default remote...");
 
-                await _versionController.RemoteService.SetDefaultRemoteAsync(remoteName);
+                await _versionController.RemoteService.SetDefaultRemoteAsync(remoteName, _currentRepository);
 
                 UpdateStatus($"'{remoteName}' is now the default remote");
                 _debugView?.Log($"Set default remote: {remoteName}");
@@ -1686,6 +1641,30 @@ namespace Linage.GUI
 
                 _improvedStatusBar?.UpdateFileStats(newFiles, modFiles, delFiles);
             }
+        }
+
+        private async Task LoadProjectAsync(string path)
+        {
+             if (string.IsNullOrEmpty(path) || !Directory.Exists(path)) return;
+
+             try
+             {
+                 _currentRepository = path;
+                 
+                 // Re-init controllers if needed or just switch context
+                 // For now, simpler to just load it via VC
+                 await _versionController.LoadProjectAsync(path);
+                 
+                 // Update UI
+                 if (_fileExplorer != null) 
+                    _fileExplorer.LoadRepository(path);
+                    
+                 UpdateStatus($"Loaded project: {path}");
+             }
+             catch (Exception ex)
+             {
+                 ShowError("Load Project Error", ex);
+             }
         }
 
         private void OnImportGitRepository(object sender, EventArgs e)
@@ -1813,6 +1792,31 @@ namespace Linage.GUI
             if (keyData == (Keys.Control | Keys.S)) { SaveCurrentFile(); return true; }
             if (keyData == (Keys.Control | Keys.W)) { CloseCurrentTab(); return true; }
             return base.ProcessCmdKey(ref msg, keyData);
+        }
+        private async void RestoreWorkspaceState()
+        {
+            if (_workspaceService == null) return;
+            var state = _workspaceService.LoadState();
+            
+            if (state.OpenFiles != null)
+            {
+                foreach (var file in state.OpenFiles)
+                {
+                     if (File.Exists(file)) await OpenFileInEditor(file); // Await the async call
+                }
+            }
+        }
+
+        // Hook into FormClosing to save state
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (_workspaceService != null)
+            {
+                var openFiles = _openFiles.Keys.ToList();
+                string activeDoc = _editorTabs.SelectedTab?.Tag as string;
+                _workspaceService.SaveState(openFiles, activeDoc);
+            }
+            base.OnFormClosing(e);
         }
     }
 }

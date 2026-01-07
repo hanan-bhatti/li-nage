@@ -340,13 +340,22 @@ namespace Linage.Infrastructure
         }
 
         /// <summary>
-        /// Asynchronously get all branches with eager loading of head commits and their snapshots
+        /// Asynchronously get all branches with eager loading of head commits and their snapshots.
+        /// Optionally filtered by repository path.
         /// </summary>
-        public async Task<List<Branch>> GetAllBranchesAsync()
+        public async Task<List<Branch>> GetAllBranchesAsync(string repositoryPath = null)
         {
-            return await _context.Branches
+            var query = _context.Branches
                 .Include(b => b.HeadCommit)
                 .Include(b => b.HeadCommit.Snapshot.Files)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(repositoryPath))
+            {
+                query = query.Where(b => b.RepositoryPath == repositoryPath);
+            }
+
+            return await query
                 .ToListAsync()
                 .ConfigureAwait(false);
         }
@@ -689,12 +698,22 @@ namespace Linage.Infrastructure
         /// <summary>
         /// Asynchronously get a remote by name
         /// </summary>
-        public async Task<Remote> GetRemoteAsync(string name)
+        /// <summary>
+        /// Asynchronously get a remote by name, optionally filtered by repository path.
+        /// </summary>
+        public async Task<Remote> GetRemoteAsync(string name, string repositoryPath = null)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Remote name cannot be null or empty", nameof(name));
 
-            return await _context.Remotes
+            var query = _context.Remotes.AsQueryable();
+
+            if (!string.IsNullOrEmpty(repositoryPath))
+            {
+                query = query.Where(r => r.RepositoryPath == repositoryPath);
+            }
+
+            return await query
                 .FirstOrDefaultAsync(r => r.RemoteName == name)
                 .ConfigureAwait(false);
         }
@@ -709,11 +728,17 @@ namespace Linage.Infrastructure
         }
 
         /// <summary>
-        /// Asynchronously get all remotes
+        /// Asynchronously get all remotes, optionally filtered by repository path.
         /// </summary>
-        public async Task<List<Remote>> GetAllRemotesAsync()
+        public async Task<List<Remote>> GetAllRemotesAsync(string repositoryPath = null)
         {
-            return await _context.Remotes
+            var query = _context.Remotes.AsQueryable();
+            if (!string.IsNullOrEmpty(repositoryPath))
+            {
+                query = query.Where(r => r.RepositoryPath == repositoryPath);
+            }
+
+            return await query
                 .ToListAsync()
                 .ConfigureAwait(false);
         }

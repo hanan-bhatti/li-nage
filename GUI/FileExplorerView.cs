@@ -29,6 +29,7 @@ namespace Linage.GUI
         {
             InitializeComponent();
             SetupContextMenu();
+            this.Load += (s, e) => LoadTree(null); // Ensure empty state loads on startup
         }
 
         public void ApplyTheme()
@@ -71,15 +72,24 @@ namespace Linage.GUI
             // Context Menu
             if (_contextMenu != null)
             {
-                _contextMenu.Renderer = new ToolStripProfessionalRenderer(new ModernMenuRenderer());
+                _contextMenu.Renderer = new PremiumMenuRenderer();
             }
         }
 
         private void SetupContextMenu()
         {
             _contextMenu = new ContextMenuStrip();
-            _contextMenu.Renderer = new ToolStripProfessionalRenderer(new ModernMenuRenderer());
+            _contextMenu.Renderer = new PremiumMenuRenderer();
             
+            // Define Items
+            var menuOpenProject = new ToolStripMenuItem("Open Project...", null, (s, e) => 
+            {
+                 using (var fbd = new FolderBrowserDialog())
+                 {
+                     if (fbd.ShowDialog() == DialogResult.OK) LoadRepository(fbd.SelectedPath);
+                 }
+            });
+
             var menuOpen = new ToolStripMenuItem("Open", null, (s, e) => OpenSelectedNode());
             var menuReveal = new ToolStripMenuItem("Reveal in Explorer", null, OnRevealInExplorerClick);
             var menuCopyPath = new ToolStripMenuItem("Copy Path", null, OnCopyPathClick);
@@ -87,19 +97,50 @@ namespace Linage.GUI
             var menuNewFolder = new ToolStripMenuItem("New Folder", null, OnNewFolderClick);
             var menuRename = new ToolStripMenuItem("Rename", null, OnRenameClick);
             var menuDelete = new ToolStripMenuItem("Delete", null, OnDeleteClick);
-            
-            _contextMenu.Items.AddRange(new ToolStripItem[] { 
-                menuOpen,
-                new ToolStripSeparator(),
-                menuNewFile, 
-                menuNewFolder, 
-                new ToolStripSeparator(),
-                menuReveal,
-                menuCopyPath,
-                new ToolStripSeparator(),
-                menuRename,
-                menuDelete 
-            });
+
+            // Dynamic Population
+            _contextMenu.Opening += (s, e) => 
+            {
+                _contextMenu.Items.Clear();
+                
+                if (string.IsNullOrEmpty(_rootPath))
+                {
+                    // No Project Open
+                    _contextMenu.Items.Add(menuOpenProject);
+                }
+                else
+                {
+                    // Project Open
+                    var node = _treeView.SelectedNode;
+                    
+                    if (node != null)
+                    {
+                        // Item Selected
+                        _contextMenu.Items.AddRange(new ToolStripItem[] { 
+                            menuOpen,
+                            new ToolStripSeparator(),
+                            menuNewFile, 
+                            menuNewFolder, 
+                            new ToolStripSeparator(),
+                            menuReveal,
+                            menuCopyPath,
+                            new ToolStripSeparator(),
+                            menuRename,
+                            menuDelete 
+                        });
+                    }
+                    else
+                    {
+                        // Background Click (Empty area in project)
+                        _contextMenu.Items.AddRange(new ToolStripItem[] {
+                            menuOpenProject,
+                            new ToolStripSeparator(),
+                            menuNewFile,
+                            menuNewFolder
+                        });
+                    }
+                }
+            };
 
             _treeView.ContextMenuStrip = _contextMenu;
         }
@@ -285,7 +326,11 @@ namespace Linage.GUI
             if (string.IsNullOrEmpty(targetDir)) targetDir = _rootPath;
             if (string.IsNullOrEmpty(targetDir)) return;
 
-            string name = Microsoft.VisualBasic.Interaction.InputBox($"Enter {(isFolder ? "folder" : "file")} name:", "New", "");
+            string name = "";
+            using (var dialog = new Linage.GUI.Dialogs.ModernInputDialog("New", $"Enter {(isFolder ? "folder" : "file")} name:"))
+            {
+                if (dialog.ShowDialog() == DialogResult.OK) name = dialog.InputValue;
+            }
             if (string.IsNullOrWhiteSpace(name)) return;
 
             string fullPath = Path.Combine(targetDir, name);
@@ -306,7 +351,11 @@ namespace Linage.GUI
             var node = _treeView.SelectedNode;
             if (node?.Tag == null) return;
             string oldPath = node.Tag.ToString();
-            string newName = Microsoft.VisualBasic.Interaction.InputBox("New name:", "Rename", Path.GetFileName(oldPath));
+            string newName = "";
+            using (var dialog = new Linage.GUI.Dialogs.ModernInputDialog("Rename", "New name:", Path.GetFileName(oldPath)))
+            {
+                if (dialog.ShowDialog() == DialogResult.OK) newName = dialog.InputValue;
+            }
             if (string.IsNullOrWhiteSpace(newName)) return;
             
             string newPath = Path.Combine(Path.GetDirectoryName(oldPath), newName);
@@ -345,10 +394,42 @@ namespace Linage.GUI
         {
             _treeView.BeginUpdate();
             _treeView.Nodes.Clear();
-            if (string.IsNullOrEmpty(_rootPath)) { _treeView.EndUpdate(); return; }
+            if (string.IsNullOrEmpty(_rootPath)) 
+            {
+                 // Allow execution to proceed to Empty State logic below
+            }
 
             try
             {
+                // Clear any "Open Project" button if it exists
+                foreach (Control c in this.Controls) if (c is MaterialButton && (string)c.Tag == "OpenTrigger") { this.Controls.Remove(c); break; }
+
+                if (string.IsNullOrEmpty(_rootPath)) 
+                { 
+                    _treeView.EndUpdate();
+                    
+                    // Show Empty State Button
+                    var btnOpen = new MaterialButton
+                    {
+                        Text = "Open Project",
+                        Size = new Size(140, 40),
+                        Tag = "OpenTrigger", // Mark for removal
+                        Location = new Point((this.Width - 140)/2, (this.Height - 40)/2),
+                        Anchor = AnchorStyles.None 
+                    };
+                    btnOpen.Click += (s, e) => 
+                    {
+                        // Trigger open folder logic - relying on Main Window command or simple folder browser from here
+                        using (var fbd = new FolderBrowserDialog())
+                        {
+                            if (fbd.ShowDialog() == DialogResult.OK) LoadRepository(fbd.SelectedPath);
+                        }
+                    };
+                    this.Controls.Add(btnOpen);
+                    btnOpen.BringToFront();
+                    return; 
+                }
+
                 var rootNode = new TreeNode(Path.GetFileName(_rootPath)) { Tag = _rootPath, ImageIndex = 0 };
                 bool hasMatches = LoadDirectory(rootNode, _rootPath, filter);
                 
@@ -362,7 +443,7 @@ namespace Linage.GUI
             _treeView.EndUpdate();
         }
 
-        private bool LoadDirectory(TreeNode parentNode, string path, string filter)
+        public bool LoadDirectory(TreeNode parentNode, string path, string filter)
         {
             bool anyMatch = false;
             try
@@ -423,15 +504,7 @@ namespace Linage.GUI
         public new void Refresh() => LoadRepository(_rootPath);
         private int GetFileIcon(string f) => 1;
 
-        // Helper for Context Menu Styling
-        private class ModernMenuRenderer : ProfessionalColorTable
-        {
-            public override Color MenuItemSelected => ModernTheme.SurfaceLight;
-            public override Color MenuBorder => ModernTheme.BorderColor;
-            public override Color ToolStripDropDownBackground => ModernTheme.SurfaceColor;
-            public override Color ImageMarginGradientBegin => ModernTheme.SurfaceColor;
-            public override Color ImageMarginGradientEnd => ModernTheme.SurfaceColor;
-        }
+        // Helper for Context Menu Styling - Removed (Using PremiumMenuRenderer from Controls)
     }
 
     public class FileSelectedEventArgs : EventArgs { public string FilePath { get; set; } }

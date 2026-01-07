@@ -18,6 +18,7 @@ namespace Linage.Core
         public RemoteProtocol Protocol { get; set; }
         public string FetchRefspec { get; set; }
         public string PushRefspec { get; set; }
+        public string RepositoryPath { get; set; } // Added for multi-repo filtering
         public bool IsDefault { get; set; }
 
         public Remote()

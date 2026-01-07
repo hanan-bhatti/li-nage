@@ -10,8 +10,6 @@ namespace Linage.GUI.Notifications
     {
         private readonly NotificationItem _notification;
         private Timer _timer;
-        private Timer _animationTimer;
-        private int _targetY;
         private bool _isHovered;
         private const int ToastWidth = 350;
         private const int ToastMinHeight = 80;

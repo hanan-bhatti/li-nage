@@ -49,6 +49,7 @@ namespace Linage.GUI.Theme
         public static Color AccentHover => PrimaryDark;
         public static Color InputBack => Color.FromArgb(60, 60, 60); // Input field bg
         public static Color SelectionBack => Color.FromArgb(9, 71, 113); // Selection
+        public static Color SelectionColor => SelectionBack; // Alias for compatibility
 
 
         // Typography

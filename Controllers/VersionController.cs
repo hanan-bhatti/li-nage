@@ -38,13 +38,17 @@ namespace Linage.Controllers
         public ChangeDetector ChangeDetector { get; private set; }
         public RemoteService RemoteService { get; private set; }
         public AuthenticationService AuthService { get; private set; }
+        public Core.Results.Result InitializationResult { get; private set; }
         
         private readonly MetadataStore _metadataStore;
         private readonly FileService _fileService;
         private readonly HashService _hashService;
+        private readonly AuthenticationService _authService;
         private readonly CredentialStore _credentialStore;
         private RemoteController _remoteController; // Not readonly - initialized in LoadProject
         private readonly AuthController _authController;
+        private readonly VersionGraphService _graphService;
+        private readonly ChangeDetector _changeDetector;
         private string _currentRootPath;
 
         public VersionController()
@@ -54,32 +58,48 @@ namespace Linage.Controllers
             {
                 var dbContext = new LiNageDbContext();
                 
-                _metadataStore = new MetadataStore(dbContext);
+                _metadataStore = new MetadataStore(dbContext); // Dependencies
                 _hashService = new HashService();
                 _fileService = new FileService(_hashService);
-                GraphService = new VersionGraphService(_metadataStore);
-                
-                // Phase 3 Integration
                 _credentialStore = new CredentialStore();
-                AuthService = new AuthenticationService(_credentialStore);
-                _authController = new AuthController(AuthService);
+                _authService = new AuthenticationService(_credentialStore);
+                _authController = new AuthController(_authService);
                 
-                RemoteService = new RemoteService(_metadataStore);
+                // Services
+                _changeDetector = new ChangeDetector(Directory.GetCurrentDirectory()); // Default to storage root?
+                
+                // Lazy initialize graph service (requires repo path)
+                _graphService = new VersionGraphService(_metadataStore);
+
+                InitializationResult = Core.Results.Result.Ok();
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException(
-                    "Failed to initialize database context. Ensure SQL Server is running and configured properly. " +
-                    "Check the connection string in App.config (LinageDbContext). " +
-                    "If using LocalDB, verify it's installed and the service is running.",
-                    ex);
+                InitializationResult = Core.Results.Result.Fail("Failed to initialize VersionController", ex);
             }
+        }
+
+        public VersionController(string repositoryRoot, MetadataStore metadataStore)
+        {
+            _metadataStore = metadataStore ?? throw new ArgumentNullException(nameof(metadataStore));
+            _hashService = new HashService();
+            _fileService = new FileService(_hashService);
+            _credentialStore = new CredentialStore(); 
+            _authService = new AuthenticationService(_credentialStore);
+            _authController = new AuthController(_authService);
+            
+            _changeDetector = new ChangeDetector(repositoryRoot);
+            _graphService = new VersionGraphService(_metadataStore);
+            
+            InitializationResult = Core.Results.Result.Ok();
         }
 
         public GitImportService CreateGitImporter()
         {
             return new GitImportService(_metadataStore, _hashService, _fileService, GraphService);
         }
+
+
 
         public async Task LoadProjectAsync(string rootPath)
         {
@@ -363,7 +383,7 @@ namespace Linage.Controllers
 
         public async Task Push(string remoteName)
         {
-            var remote = await RemoteService.GetRemoteAsync(remoteName); 
+            var remote = await RemoteService.GetRemoteAsync(remoteName, _currentRootPath); 
             if (remote == null) throw new ArgumentException($"Remote '{remoteName}' not found.");
 
             var currentBranch = GraphService.GetCurrentBranch();
@@ -376,7 +396,7 @@ namespace Linage.Controllers
 
         public async Task Pull(string remoteName)
         {
-            var remote = await RemoteService.GetRemoteAsync(remoteName);
+            var remote = await RemoteService.GetRemoteAsync(remoteName, _currentRootPath);
             if (remote == null) throw new ArgumentException($"Remote '{remoteName}' not found.");
 
             var currentBranch = GraphService.GetCurrentBranch();

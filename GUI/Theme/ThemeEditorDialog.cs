@@ -10,7 +10,6 @@ namespace Linage.GUI.Theme
         private ComboBox _themeSelector;
         private FlowLayoutPanel _colorsPanel;
         private ThemeConfig _editingTheme;
-        private bool _isDirty;
 
         public ThemeEditorDialog()
         {
@@ -112,7 +111,6 @@ namespace Linage.GUI.Theme
                 AddColorEditor(prop.Name, hexColor, (newColor) => 
                 {
                     prop.SetValue(_editingTheme, newColor);
-                    _isDirty = true;
                 });
             }
         }

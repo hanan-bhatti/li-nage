@@ -12,6 +12,7 @@ namespace Linage.Core
     {
         public Guid BranchId { get; set; } = Guid.NewGuid();
         public string BranchName { get; set; }
+        public string RepositoryPath { get; set; } // Added for multi-repo filtering logic
         public Commit HeadCommit { get; set; }
         public bool IsActive { get; set; } = true;
         public DateTime CreatedDate { get; set; } = DateTime.Now;

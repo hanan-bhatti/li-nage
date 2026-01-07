@@ -143,6 +143,10 @@ namespace Linage.Infrastructure
                 .Property(b => b.BranchName)
                 .IsRequired()
                 .HasMaxLength(255);
+
+            modelBuilder.Entity<Branch>()
+                .Property(b => b.RepositoryPath)
+                .HasMaxLength(500);
             
             modelBuilder.Entity<Branch>()
                 .HasOptional(b => b.HeadCommit)
@@ -162,6 +166,10 @@ namespace Linage.Infrastructure
                 .Property(r => r.RemoteUrl)
                 .IsRequired()
                 .HasMaxLength(1000);
+
+            modelBuilder.Entity<Remote>()
+                .Property(r => r.RepositoryPath)
+                .HasMaxLength(500);
 
             // AIActivity Configuration
             modelBuilder.Entity<AIActivity>()

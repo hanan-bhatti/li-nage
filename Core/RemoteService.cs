@@ -14,16 +14,17 @@ namespace Linage.Core
             _metadataStore = metadataStore ?? throw new ArgumentNullException(nameof(metadataStore));
         }
 
-        public async Task AddRemoteAsync(string name, string url, RemoteProtocol protocol = RemoteProtocol.HTTPS)
+        public async Task AddRemoteAsync(string name, string url, string repositoryPath, RemoteProtocol protocol = RemoteProtocol.HTTPS)
         {
             if (string.IsNullOrEmpty(name)) throw new ArgumentException("Remote name cannot be empty.");
             if (string.IsNullOrEmpty(url)) throw new ArgumentException("Remote URL cannot be empty.");
 
-            var allRemotes = await _metadataStore.GetAllRemotesAsync();
+            var allRemotes = await _metadataStore.GetAllRemotesAsync(repositoryPath);
             var remote = new Remote
             {
                 RemoteName = name,
                 RemoteUrl = url,
+                RepositoryPath = repositoryPath,
                 Protocol = protocol,
                 IsDefault = allRemotes.Count == 0
             };
@@ -31,14 +32,14 @@ namespace Linage.Core
             await _metadataStore.SaveRemoteAsync(remote);
         }
 
-        public async Task<Remote> GetRemoteAsync(string name)
+        public async Task<Remote> GetRemoteAsync(string name, string repositoryPath = null)
         {
-            return await _metadataStore.GetRemoteAsync(name);
+            return await _metadataStore.GetRemoteAsync(name, repositoryPath);
         }
 
-        public async Task<List<Remote>> GetAllRemotesAsync()
+        public async Task<List<Remote>> GetAllRemotesAsync(string repositoryPath = null)
         {
-            return await _metadataStore.GetAllRemotesAsync();
+            return await _metadataStore.GetAllRemotesAsync(repositoryPath);
         }
 
         public async Task RemoveRemoteAsync(string name)
@@ -46,9 +47,9 @@ namespace Linage.Core
             await _metadataStore.DeleteRemoteAsync(name);
         }
 
-        public async Task SetDefaultRemoteAsync(string name)
+        public async Task SetDefaultRemoteAsync(string name, string repositoryPath)
         {
-            var remotes = await _metadataStore.GetAllRemotesAsync();
+            var remotes = await _metadataStore.GetAllRemotesAsync(repositoryPath);
             foreach (var r in remotes)
             {
                 r.IsDefault = (r.RemoteName == name);

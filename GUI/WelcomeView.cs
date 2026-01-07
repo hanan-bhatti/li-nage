@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using Linage.GUI.Theme;
+using Linage.GUI.Controls;
 
 namespace Linage.GUI
 {
@@ -14,11 +15,12 @@ namespace Linage.GUI
         private Panel _contentPanel;
         private Label _titleLabel;
         private Label _subtitleLabel;
-        private LinkLabel _openRepoLink;
+        private MaterialButton _openRepoButton; // Changed from LinkLabel
         private LinkLabel _cloneRepoLink;
         private LinkLabel _importGitLink;
         private Label _recentLabel;
         private FlowLayoutPanel _recentPanel;
+        private Label _taglineLabel; // New Tagline
 
         public event EventHandler OpenRepositoryClicked;
         public event EventHandler CloneRepositoryClicked;
@@ -39,7 +41,7 @@ namespace Linage.GUI
             _contentPanel = new Panel
             {
                 Width = 600,
-                Height = 500,
+                Height = 550, // Increased height for new elements
                 BackColor = Color.Transparent
             };
 
@@ -47,69 +49,87 @@ namespace Linage.GUI
             _titleLabel = new Label
             {
                 Text = "Li'nage",
-                Font = new Font("Segoe UI", 42, FontStyle.Bold),
+                Font = new Font("Segoe UI", 48, FontStyle.Bold), // Larger
                 ForeColor = ModernTheme.TextPrimary,
                 AutoSize = true,
-                Location = new Point(0, 40)
+                Location = new Point(0, 20)
             };
 
             // Subtitle
             _subtitleLabel = new Label
             {
                 Text = "Line-Level Version Control",
-                Font = new Font("Segoe UI", 14, FontStyle.Regular),
-                ForeColor = ModernTheme.TextSecondary,
+                Font = new Font("Segoe UI", 16, FontStyle.Regular),
+                ForeColor = ModernTheme.TextSecondary, // Will be dimmed further in paint if needed, or stick to theme
                 AutoSize = true,
-                Location = new Point(5, 110)
+                Location = new Point(5, 100)
+            };
+            
+            // Tagline - "Track changes at the line level, not files."
+            _taglineLabel = new Label
+            {
+                Text = "Track changes at the line level, not files.",
+                Font = new Font("Segoe UI", 10, FontStyle.Italic),
+                ForeColor = ModernTheme.TextDisabled, // Subtle
+                AutoSize = true,
+                Location = new Point(5, 135)
             };
 
             // Accent line (creative touch)
             var accentLine = new Panel
             {
-                Width = 120,
-                Height = 4,
+                Width = 80, // Slightly shorter, more minimal
+                Height = 3,
                 BackColor = ModernTheme.PrimaryColor,
-                Location = new Point(0, 155)
+                Location = new Point(5, 165)
             };
 
             // Action buttons section
             var actionsLabel = new Label
             {
                 Text = "GET STARTED",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                ForeColor = ModernTheme.TextSecondary,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                ForeColor = ModernTheme.TextDisabled, // Very subtle header
                 AutoSize = true,
-                Location = new Point(0, 190)
+                Location = new Point(5, 200)
             };
 
-            // Open Repository
-            _openRepoLink = CreateActionLink("📂 Open Repository", 220);
-            _openRepoLink.Click += (s, e) => OpenRepositoryClicked?.Invoke(this, EventArgs.Empty);
+            // Open Repository - Primary Action Button
+            _openRepoButton = new MaterialButton
+            {
+                Text = " OPEN REPOSITORY",
+                Size = new Size(220, 45), // Big click target
+                Location = new Point(0, 230),
+                BackColor = ModernTheme.PrimaryColor,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 11, FontStyle.Bold)
+            };
+            _openRepoButton.Click += (s, e) => OpenRepositoryClicked?.Invoke(this, EventArgs.Empty);
 
-            // Clone Repository
-            _cloneRepoLink = CreateActionLink("⬇ Clone Repository", 265);
+            // Clone Repository - Secondary Link
+            _cloneRepoLink = CreateActionLink("⬇ Clone Repository", 295, false); // Lower visual weight
             _cloneRepoLink.Click += (s, e) => CloneRepositoryClicked?.Invoke(this, EventArgs.Empty);
 
-            // Import from Git
-            _importGitLink = CreateActionLink("🔄 Import Git Repository", 310);
+            // Import from Git - Secondary Link
+            _importGitLink = CreateActionLink("🔄 Import Git Repository", 335, false);
             _importGitLink.Click += (s, e) => ImportGitClicked?.Invoke(this, EventArgs.Empty);
 
             // Recent projects section
             _recentLabel = new Label
             {
                 Text = "RECENT",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                ForeColor = ModernTheme.TextSecondary,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                ForeColor = ModernTheme.TextDisabled,
                 AutoSize = true,
-                Location = new Point(0, 370),
+                Location = new Point(5, 400),
                 Visible = false
             };
 
             _recentPanel = new FlowLayoutPanel
             {
-                Location = new Point(0, 400),
+                Location = new Point(0, 430),
                 Width = 580,
-                Height = 80,
+                Height = 100,
                 FlowDirection = FlowDirection.TopDown,
                 AutoScroll = false,
                 BackColor = Color.Transparent,
@@ -119,9 +139,10 @@ namespace Linage.GUI
             // Add all controls to content panel
             _contentPanel.Controls.Add(_titleLabel);
             _contentPanel.Controls.Add(_subtitleLabel);
+            _contentPanel.Controls.Add(_taglineLabel);
             _contentPanel.Controls.Add(accentLine);
             _contentPanel.Controls.Add(actionsLabel);
-            _contentPanel.Controls.Add(_openRepoLink);
+            _contentPanel.Controls.Add(_openRepoButton);
             _contentPanel.Controls.Add(_cloneRepoLink);
             _contentPanel.Controls.Add(_importGitLink);
             _contentPanel.Controls.Add(_recentLabel);
@@ -131,22 +152,22 @@ namespace Linage.GUI
             this.Resize += OnResize;
         }
 
-        private LinkLabel CreateActionLink(string text, int yPos)
+        private LinkLabel CreateActionLink(string text, int yPos, bool primary)
         {
             var link = new LinkLabel
             {
                 Text = text,
-                Font = new Font("Segoe UI", 13, FontStyle.Regular),
+                Font = new Font("Segoe UI", 11, FontStyle.Regular), // Smaller than before
                 AutoSize = true,
-                Location = new Point(0, yPos),
-                LinkColor = ModernTheme.TextPrimary,
+                Location = new Point(10, yPos), // Indented slightly relative to button
+                LinkColor = primary ? ModernTheme.TextPrimary : ModernTheme.TextSecondary, // Dimmer
                 ActiveLinkColor = ModernTheme.PrimaryColor,
-                VisitedLinkColor = ModernTheme.TextPrimary,
+                VisitedLinkColor = primary ? ModernTheme.TextPrimary : ModernTheme.TextSecondary,
                 LinkBehavior = LinkBehavior.HoverUnderline
             };
 
             link.MouseEnter += (s, e) => link.ForeColor = ModernTheme.PrimaryColor;
-            link.MouseLeave += (s, e) => link.ForeColor = ModernTheme.TextPrimary;
+            link.MouseLeave += (s, e) => link.ForeColor = primary ? ModernTheme.TextPrimary : ModernTheme.TextSecondary;
 
             return link;
         }

@@ -25,9 +25,21 @@ namespace Linage.GUI
             _owner = owner;
         }
 
-        public static void Show(string message, NotificationType type = NotificationType.Info, int durationMs = 5000)
+        public static void Show(string message, NotificationType type = NotificationType.Info, int durationMs = -1)
         {
             if (_owner == null) return;
+
+            // Set default durations if not specified
+            if (durationMs == -1)
+            {
+                switch (type)
+                {
+                    case NotificationType.Success: durationMs = 3000; break; // Fast
+                    case NotificationType.Warning: durationMs = 8000; break; // Slower
+                    case NotificationType.Error: durationMs = 0; break;      // Persistent
+                    default: durationMs = 5000; break;
+                }
+            }
 
             if (_owner.InvokeRequired)
             {
@@ -72,9 +84,12 @@ namespace Linage.GUI
             _type = type;
             InitializeComponent(message);
             
-            _timer = new Timer { Interval = durationMs };
-            _timer.Tick += (s, e) => Close();
-            _timer.Start();
+            if (durationMs > 0)
+            {
+                _timer = new Timer { Interval = durationMs };
+                _timer.Tick += (s, e) => Close();
+                _timer.Start();
+            }
         }
 
         private void InitializeComponent(string message)
@@ -82,7 +97,7 @@ namespace Linage.GUI
             this.FormBorderStyle = FormBorderStyle.None;
             this.ShowInTaskbar = false;
             this.StartPosition = FormStartPosition.Manual;
-            this.Size = new Size(300, 60);
+            this.Size = new Size(320, 70); // Slightly larger
             this.BackColor = ModernTheme.SurfaceLight;
             this.Padding = new Padding(1); // Border
 
@@ -91,9 +106,9 @@ namespace Linage.GUI
             var panel = new Panel { Dock = DockStyle.Fill, BackColor = ModernTheme.SurfaceLight };
             var lblIcon = new Label { 
                 Text = GetIconForType(_type), 
-                Font = new Font("Segoe MDL2 Assets", 12f), 
+                Font = new Font("Segoe MDL2 Assets", 14f), // Larger icon
                 ForeColor = accentColor,
-                Size = new Size(40, 60),
+                Size = new Size(50, 70),
                 TextAlign = ContentAlignment.MiddleCenter,
                 Dock = DockStyle.Left
             };
@@ -104,17 +119,17 @@ namespace Linage.GUI
                 Font = ModernTheme.FontBody,
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(5, 0, 5, 0)
+                Padding = new Padding(5, 5, 5, 5)
             };
 
             var btnClose = new Label {
                 Text = "\uE8BB",
-                Font = new Font("Segoe MDL2 Assets", 8f),
+                Font = new Font("Segoe MDL2 Assets", 9f),
                 ForeColor = ModernTheme.TextSecondary,
-                Size = new Size(30, 20),
+                Size = new Size(30, 25),
                 TextAlign = ContentAlignment.MiddleCenter,
                 Cursor = Cursors.Hand,
-                Location = new Point(270, 5)
+                Location = new Point(290, 5)
             };
             btnClose.Click += (s, e) => Close();
 
@@ -130,9 +145,10 @@ namespace Linage.GUI
             panel.Controls.Add(btnClose);
             this.Controls.Add(panel);
 
-            // Add subtle shadow effect by drawing a border
+            // Add border (Colored if Error)
             this.Paint += (s, e) => {
-                using (var pen = new Pen(ModernTheme.BorderColor))
+                var borderColor = _type == NotificationType.Error ? accentColor : ModernTheme.BorderColor;
+                using (var pen = new Pen(borderColor))
                 {
                     e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
                 }

@@ -71,7 +71,7 @@ namespace Linage.Core
             await _metadataStore.SaveCommitAsync(commit);
         }
 
-        public async Task<Branch> CreateBranchAsync(string name)
+        public async Task<Branch> CreateBranchAsync(string name, string repositoryPath = null)
         {
             if (string.IsNullOrEmpty(name)) throw new ArgumentException("Branch name cannot be empty.");
             
@@ -88,6 +88,7 @@ namespace Linage.Core
             var newBranch = new Branch
             {
                 BranchName = name,
+                RepositoryPath = repositoryPath, // Store repository context
                 HeadCommit = _currentBranch?.HeadCommit, // Point to current HEAD
                 IsActive = false
             };
@@ -117,9 +118,9 @@ namespace Linage.Core
             return _currentBranch;
         }
 
-        public async Task<List<Branch>> GetAllBranchesAsync()
+        public async Task<List<Branch>> GetAllBranchesAsync(string repositoryPath = null)
         {
-            return await _metadataStore.GetAllBranchesAsync();
+            return await _metadataStore.GetAllBranchesAsync(repositoryPath);
         }
 
         public async Task SwitchBranchAsync(string name)

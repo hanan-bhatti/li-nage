@@ -8,36 +8,24 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="32c24d99-153a-4c9b-83ae-d754e5bf46c9" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.li'nage.dir/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.li'nage.dir/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Controllers/VersionController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Controllers/VersionController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/LineChange.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/LineChange.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Core/Notifications/NotificationSeverity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Notifications/NotificationSeverity.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/Branch.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Branch.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/Remote.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Remote.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/RemoteService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/RemoteService.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Core/VersionGraphService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Core/VersionGraphService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/AIHistoryView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/AIHistoryView.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/ConflictResolutionView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/ConflictResolutionView.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/GUI/Controls/ModernControls.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Controls/ModernControls.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/DebugView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/DebugView.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/EditorView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/EditorView.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/GUI/FileExplorerView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/FileExplorerView.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/GitGraphView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/GitGraphView.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/Helpers/AsyncOperationHelper.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Helpers/AsyncOperationHelper.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/GUI/MainWindow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/MainWindow.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/MergeConflictView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/MergeConflictView.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/GUI/NotificationService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/NotificationService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/Notifications/NotificationCenterPanel.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Notifications/NotificationCenterPanel.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/Notifications/NotificationPresenter.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Notifications/NotificationPresenter.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/GUI/Notifications/ToastNotification.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Notifications/ToastNotification.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/GUI/Services/IDialogService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Services/IDialogService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/Services/SyntaxHighlighter.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Services/SyntaxHighlighter.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/StagingView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/StagingView.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/GUI/TerminalView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/TerminalView.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/GUI/Theme/ModernTheme.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Theme/ModernTheme.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/GUI/Theme/ThemeEditorDialog.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Theme/ThemeEditorDialog.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GUI/Theme/ThemeManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/Theme/ThemeManager.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/GUI/WelcomeView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/GUI/WelcomeView.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Infrastructure/LiNageDbContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Infrastructure/LiNageDbContext.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Infrastructure/MetadataStore.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Infrastructure/MetadataStore.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Infrastructure/Services/NotificationManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Infrastructure/Services/NotificationManager.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -48,7 +36,7 @@
     <option name="firstShow" value="false" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="25" />
+    <option name="cachedIndexableFilesCount" value="27" />
     <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
   </component>
   <component name="Git.Settings">
@@ -64,10 +52,10 @@
     <setting file="file://$PROJECT_DIR$/GUI/CommandDispatcher.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Program.cs" root0="FORCE_HIGHLIGHTING" />
   </component>
-  <component name="KubernetesApiPersistence"><![CDATA[{}]]></component>
-  <component name="KubernetesApiProvider"><![CDATA[{
-  "isMigrated": true
-}]]></component>
+  <component name="KubernetesApiPersistence">{}</component>
+  <component name="KubernetesApiProvider">{
+  &quot;isMigrated&quot;: true
+}</component>
   <component name="LLMProjectSettings">
     <option name="turned_on" value="false" />
   </component>
@@ -155,7 +143,10 @@
       <workItem from="1767174786089" duration="616000" />
       <workItem from="1767279812569" duration="15208000" />
       <workItem from="1767596610143" duration="4804000" />
-      <workItem from="1767756756968" duration="4544000" />
+      <workItem from="1767756756968" duration="5397000" />
+      <workItem from="1767765759536" duration="2189000" />
+      <workItem from="1767772529124" duration="1099000" />
+      <workItem from="1767773958047" duration="702000" />
     </task>
     <servers />
   </component>

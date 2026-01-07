@@ -78,7 +78,10 @@ namespace Linage.GUI.Services
     {
         public string PromptForInput(string title, string prompt, string defaultValue = "")
         {
-            return Microsoft.VisualBasic.Interaction.InputBox(prompt, title, defaultValue);
+            using (var dialog = new Linage.GUI.Dialogs.ModernInputDialog(title, prompt, defaultValue))
+            {
+                return dialog.ShowDialog() == DialogResult.OK ? dialog.InputValue : "";
+            }
         }
 
         public void PromptYesNoCancel(string title, string message, Action onYes, Action onNo = null)
